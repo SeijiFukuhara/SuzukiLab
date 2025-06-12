@@ -100,7 +100,7 @@ if __name__ == '__main__':
     video_dir = os.path.dirname(path_video)
     # 現在の日時を取得してフォーマット（例: "_20250611_1930"）
     timestamp_str = datetime.now().strftime("_%Y%m%d_%H%M")
-    output_dir = os.path.join(video_dir, "csv_frames_" + str(start_frame) + "_" + str(end_frame) + timestamp_str)
+    output_dir = os.path.join(video_dir, "phase_csv_frames_" + str(start_frame) + "_" + str(end_frame) + timestamp_str)
     os.makedirs(output_dir, exist_ok=True)
     # ベースとなる src_path を定義（ダミー拡張子でOK）
     base_path = os.path.join(output_dir, "phase.csv")

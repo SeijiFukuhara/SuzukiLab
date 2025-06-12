@@ -12,5 +12,5 @@ conda activate extract_phase_env環境での動作を確認済み
 ## 使い方
 1. `flip_vertically.py`を，撮影した`.avi`ファイルに実行して上下逆転．
 2. `extract_frame.py`を，リファレンス画像と変換動画を作成．
-3. `extract_phase_video.py`で，phase_csvを作成
+3. `extract_phase_video.py`で，`phase_csv`フォルダを作成
 4. `calculate_phase.py`で，`png`と`bmp`を作成
