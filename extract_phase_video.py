@@ -8,19 +8,8 @@ import re
 from datetime import datetime
 
 from extract_phase import get_phase, _video2images,get_phase_from_reference, unwrap_phase, save_array, save_video
-
-def extract_frame_range_suffix(video_path):
-    """
-    拡張子の直前にある 'frames_XXX_YYY' から XXX, YYY を整数として取得
-    例: 'sample_video_flip_vertically_frames_420_450.avi' → (420, 450)
-    """
-    base = os.path.basename(video_path)
-    match = re.search(r'frames_(\d+)_(\d+)\.avi$', base)
-    if not match:
-        raise ValueError("ファイル名に 'frames_XXX_YYY.avi' の形式が含まれていません")
-    start, end = map(int, match.groups())
-    return start, end
-
+from function_calculation import extract_frame_range_suffix
+# from function_calculation import loadtext, offset, plot_phase, plot_phase_and_save
 try:
     import cv2
     __HAS_OPENCV__ = True
@@ -111,7 +100,7 @@ if __name__ == '__main__':
     video_dir = os.path.dirname(path_video)
     # 現在の日時を取得してフォーマット（例: "_20250611_1930"）
     timestamp_str = datetime.now().strftime("_%Y%m%d_%H%M")
-    output_dir = os.path.join(video_dir, "csv_frames" + timestamp_str)
+    output_dir = os.path.join(video_dir, "csv_frames_" + str(start_frame) + "_" + str(end_frame) + timestamp_str)
     os.makedirs(output_dir, exist_ok=True)
     # ベースとなる src_path を定義（ダミー拡張子でOK）
     base_path = os.path.join(output_dir, "phase.csv")
@@ -122,3 +111,5 @@ if __name__ == '__main__':
         save_array(target_phases[i], base_path, suffix, image_format='csv')
 
     print(f"{target_phases.shape[0]} 枚のCSVファイルを {output_dir}/ に保存しました。")
+    
+    
