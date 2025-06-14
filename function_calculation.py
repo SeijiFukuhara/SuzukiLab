@@ -6,6 +6,8 @@ from scipy import signal
 from PIL import Image
 import os
 import re
+import string
+import sys
 
 def loadtext(fname):
     fname_load = np.loadtxt(fname, delimiter = ",")
@@ -25,7 +27,7 @@ def plot_phase(np_array,d_temp):
     # plt.savefig(figname)
     # plt.show()
 
-def offset(twolist_array,convolve_mode,convolve_size_temp,z1,z2,x1,x2): #*水温と室温が一致する範囲を指定し，オフセット
+def offset(twolist_array,convolve,convolve_size_temp,z1,z2,x1,x2): #*水温と室温が一致する範囲を指定し，オフセット
     #*以下の段落をコメントアウトしているときは[from scipy import signal]の行に「アクセスできません」というメッセージが表示されるが問題ない
     #TODO 移動平均とる場合は以下最初の空行までを有効にする
     # xxに対してsize個での移動平均を取る
@@ -40,14 +42,14 @@ def offset(twolist_array,convolve_mode,convolve_size_temp,z1,z2,x1,x2): #*水温
             xx_mean[-i] *= size/(i + n_conv - (size % 2))
         # size%2は奇数偶数での違いに対応するため
         return xx_mean
-    twoarray = []
-    onelist_array = []
-    for i in range(len(twolist_array)):
-        onelist_array = list(valid_convolve(twolist_array[i], convolve_size_temp))
-        twoarray.append(onelist_array)
     #?自分で書いたけど意味わからない
-    if convolve_mode == 0:
-        twolist_array = np.array(twoarray)
+    if convolve == True:
+        twoarray_convolve = []
+        onelist_array = []
+        for i in range(len(twolist_array)):
+            onelist_array = list(valid_convolve(twolist_array[i], convolve_size_temp))
+            twoarray_convolve.append(onelist_array)
+        twolist_array = np.array(twoarray_convolve)
     #print(twolist_array)
     #TODO 左半分の領域が対象ならコメントアウト
     #img_phase = np.fliplr(img_phase)
@@ -57,14 +59,14 @@ def offset(twolist_array,convolve_mode,convolve_size_temp,z1,z2,x1,x2): #*水温
     twolist_array = offset.mean() - twolist_array
     return twolist_array
 
-def plot_phase_and_save(np_array, d_temp, fname_path, dir_bmp, dir_png):
-    path_png = fname_path.replace('.csv', '.png')
+def plot_phase_and_save(np_array, d_temp, fname_path, dir_bmp):
+    # path_png = fname_path.replace('.csv', '.png')
     path_bmp = fname_path.replace('.csv', '.bmp')
     
-    filename_png = os.path.basename(path_png)  
+    # filename_png = os.path.basename(path_png)  
     filename_bmp = os.path.basename(path_bmp)  
     
-    save_path_png = os.path.join(dir_png, filename_png)
+    # save_path_png = os.path.join(dir_png, filename_png)
     save_path_bmp = os.path.join(dir_bmp, filename_bmp)
 
     fig = plt.figure()
@@ -77,13 +79,17 @@ def plot_phase_and_save(np_array, d_temp, fname_path, dir_bmp, dir_png):
                         length_fraction=0.2, font_properties={"size": 20})
     plt.gca().add_artist(scalebar)
 
-    # 保存（拡張子は自動で適用されます：.bmp）
-    plt.savefig(save_path_png, dpi=100, bbox_inches='tight', pad_inches=0)
+    #* PNG形式で一時保存してからBMPに変換
+    temp_path_png = save_path_bmp.replace('.bmp', '_temp.png')
+    plt.savefig(temp_path_png, dpi=100, bbox_inches='tight', pad_inches=0)
     plt.close(fig)  # メモリ開放
     
     # PNG → BMP 変換
-    img = Image.open(save_path_png)
+    img = Image.open(temp_path_png)
     img.save(save_path_bmp)
+
+    # 一時PNGを削除
+    os.remove(temp_path_png)
 
 def extract_frame_range_suffix(path):
     """
@@ -110,3 +116,44 @@ def add_tilde_to_filename(src_path, prefix):
     new_base_name = prefix + base_name
     outpath = os.path.join(dir_name, new_base_name)
     return outpath
+
+def find_available_filename(input_path):
+    """
+    base_dir: 探索対象のディレクトリ
+    base_filename: ベースファイル名（例: 'result.txt'）
+    
+    戻り値: 利用可能な 'a_result.txt' ～ 'z_result.txt' のうち最初の未使用名
+    """
+    base_dir, base_filename = os.path.split(input_path)
+    existing_names = set(os.listdir(base_dir))
+    for prefix in string.ascii_lowercase:  # 'a' から 'z' まで
+        candidate_prefix = f"~{prefix}_"
+        # 同名のファイル or フォルダが存在するかを「名前の先頭一致」で確認
+        if not any(name.startswith(candidate_prefix) for name in existing_names):
+            return candidate_prefix
+    raise FileExistsError("a_〜z_まで全てのファイル名が既に存在しています。")
+
+def find_available_filename_combination(input_path):
+    """
+    入力パスの basename（末尾）に ~a_ のような形式が含まれているかをチェックし、
+    ~a1_ ～ ~a9_ の中で未使用のプレフィックスを返す。
+    """
+    base_dir = os.path.dirname(input_path)
+    tail_name = os.path.basename(input_path)  # ← ← 最後のフォルダ名またはファイル名を対象とする
+
+    # tail_name に ~a_ のような形式が含まれているかをチェック
+    match = re.match(r"~([a-z])_", tail_name)
+    if not match:
+        raise ValueError(f"パス末尾に ~a_ ～ ~z_ の形式が含まれていません: {tail_name}")
+
+    letter = match.group(1)
+    existing_names = set(os.listdir(base_dir))
+
+    for number in range(1, 10):  # ~a1_ ～ ~a9_
+        candidate_prefix = f"~{letter}{number}_"
+        if not any(name.startswith(candidate_prefix) for name in existing_names):
+            return candidate_prefix
+
+    raise FileExistsError(f"{tail_name} に対する ~{letter}1_ 〜 ~{letter}9_ がすべて使用されています。")
+
+

@@ -9,7 +9,7 @@ from datetime import datetime
 import time
 
 from extract_phase import get_phase, _video2images,get_phase_from_reference, unwrap_phase, save_array, save_video
-from function_calculation import extract_frame_range_suffix, add_tilde_to_filename
+from function_calculation import extract_frame_range_suffix, add_tilde_to_filename, find_available_filename
 # from function_calculation import loadtext, offset, plot_phase, plot_phase_and_save
 try:
     import cv2
@@ -30,7 +30,7 @@ if __name__ == '__main__':
             'or \nget_phase.py [path/to/video] reference_frames(e.g. 1,2 or 1-10)'
         )
 
-    #* "20250614_183045" のような日付＋時刻
+    # #* "20250614_183045" のような日付＋時刻
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     config = ConfigParser()
@@ -44,7 +44,20 @@ if __name__ == '__main__':
     path_video = sys.argv[2]
     video_images = None
     started = time.time()
-    
+
+
+
+
+    dir_ref = os.path.abspath(os.path.dirname(path_refimages))
+    dir_video = os.path.abspath(os.path.dirname(path_video))
+
+    if dir_ref == dir_video:
+        prefix = find_available_filename(path_video)
+    else:
+        print(" エラー: リファレンス画像 と 変換動画 は同じディレクトリに存在しません。")
+        print(f"  リファレンス画像 のディレクトリ: {dir_ref}")
+        print(f"  変換動画 のディレクトリ: {dir_video}")
+
     cap = cv2.VideoCapture(path_video)
 
     # フレーム数を取得
@@ -94,8 +107,7 @@ if __name__ == '__main__':
             float(config['postprocess']['unwrap_phase_min']),
             float(config['postprocess']['unwrap_phase_max'])
         )
-    path_video = add_tilde_to_filename(path_video, timestamp)  #* ファイル名の先頭に timestamp を追加（なくてもよい）
-    path_video = add_tilde_to_filename(path_video, "~")  #* ファイル名の先頭に '~' を追加（なくてもよい）
+    path_video = add_tilde_to_filename(path_video, prefix)#* ファイル名の先頭に prefix を追加（なくてもよい）
     save_video(target_phases, path_video, '_phase', video_format='avi')
 
 
@@ -115,11 +127,8 @@ if __name__ == '__main__':
     start_frame, end_frame = extract_frame_range_suffix(path_video)
     # 保存するディレクトリを作成
     video_dir = os.path.dirname(path_video)
-    # 現在の日時を取得してフォーマット（例: "_20250611_1930"）
-    timestamp_str = datetime.now().strftime("_%Y%m%d_%H%M")
-    output_dir = os.path.join(video_dir, "phase_csv_frames_" + str(start_frame) + "_" + str(end_frame) + timestamp_str)
-    output_dir = add_tilde_to_filename(output_dir, timestamp)  #* ファイル名の先頭に timestamp を追加（なくてもよい）
-    output_dir = add_tilde_to_filename(output_dir, "~")  #* ファイル名の先頭に '~' を追加（なくてもよい）
+    output_dir = os.path.join(video_dir, "phase_csv_frames_" + str(start_frame) + "_" + str(end_frame))
+    output_dir = add_tilde_to_filename(output_dir, prefix)  #* ファイル名の先頭に prefix を追加（なくてもよい）
     os.makedirs(output_dir, exist_ok=True)
     
     # ベースとなる src_path を定義（ダミー拡張子でOK）
@@ -139,9 +148,7 @@ if __name__ == '__main__':
         settings_text = f.read()
 
     log_path = os.path.join(video_dir, "conversion.log")    
-    log_path = add_tilde_to_filename(log_path, timestamp)  #* ファイル名の先頭に timestamp を追加（なくてもよい）
-    log_path = add_tilde_to_filename(log_path, "~")  #* ファイル名の先頭に '~' を追加（なくてもよい）
-    
+    log_path = add_tilde_to_filename(log_path, prefix)  #* ファイル名の先頭に prefix を追加（なくてもよい）
 
     with open(log_path, "a", encoding="utf-8") as f:
         f.write("=== 変換時刻 ===\n")
