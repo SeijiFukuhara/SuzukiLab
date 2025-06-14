@@ -78,7 +78,7 @@ with open(log_path, "a", encoding="utf-8") as f:
     f.write(f"使用プログラム：{sys.argv[0]}\n")
     f.write(f"csvフォルダ名：{sys.argv[1]}\n")
     f.write("=== 出力 ===\n")
-    f.write(f"位相画像保存先: {output_bmp_folder}秒\n")
+    f.write(f"位相画像保存先: {output_bmp_folder}\n")
     f.write(f"変換処理時間: {elapsed_time_phase:.2f}秒\n")
     f.write("=== 使用した設定内容 ===\n")
     f.write(f"変換比率 d_temp：{d_temp}\n")
