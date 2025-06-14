@@ -6,9 +6,10 @@ import PIL.Image
 import os
 import re
 from datetime import datetime
+import time
 
 from extract_phase import get_phase, _video2images,get_phase_from_reference, unwrap_phase, save_array, save_video
-from function_calculation import extract_frame_range_suffix
+from function_calculation import extract_frame_range_suffix, add_tilde_to_filename
 # from function_calculation import loadtext, offset, plot_phase, plot_phase_and_save
 try:
     import cv2
@@ -28,7 +29,10 @@ if __name__ == '__main__':
             '\n         e.g. step[0-9][0-9].bmp will cover step01.bmp, step02.bmp, ..., step99.bmp'
             'or \nget_phase.py [path/to/video] reference_frames(e.g. 1,2 or 1-10)'
         )
-    
+
+    #* "20250614_183045" のような日付＋時刻
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     config = ConfigParser()
     config.read('settings.ini')
     image_format = config['output']['format'].strip()
@@ -46,7 +50,7 @@ if __name__ == '__main__':
     # フレーム数を取得
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    print(f"入力動画総フレーム数: {frame_count}")
+    print(f"動画フレーム数: {frame_count}")
 
     #* sys.argv[1]が動画ファイルの場合、
     #* 動画ファイルを分解して1フレーム目の画像(image)と画像すべての配列(video_images)を取得
@@ -58,7 +62,9 @@ if __name__ == '__main__':
     video_images = list(video_images)
     video_images.insert(0, image_ref)
 
-    print(f"出力動画総フレーム数: {np.array(video_images).shape[0]}")
+    print("変換を開始します...")
+
+    start_time_convert = time.time() # 変換の計測開始
 
     parameters, convolved = get_phase(np.array(image), config, parameters=None)
     amplitude, phase = np.abs(convolved), np.angle(convolved)
@@ -88,11 +94,22 @@ if __name__ == '__main__':
             float(config['postprocess']['unwrap_phase_min']),
             float(config['postprocess']['unwrap_phase_max'])
         )
+    path_video = add_tilde_to_filename(path_video, timestamp)  #* ファイル名の先頭に timestamp を追加（なくてもよい）
+    path_video = add_tilde_to_filename(path_video, "~")  #* ファイル名の先頭に '~' を追加（なくてもよい）
     save_video(target_phases, path_video, '_phase', video_format='avi')
-    print(f"処理時間: {time.time() - started:.2f}秒")
-    print("おわったよ！！！")
 
-    print(target_phases.shape)
+
+    end_time_convert = time.time()  # 終了時刻
+    elapsed_time_convert = end_time_convert - start_time_convert
+
+    print("変換が完了しました。")
+    print(f"処理時間: {elapsed_time_convert:.2f}秒")
+
+    # print(target_phases.shape)
+
+
+    print("CSVファイルを保存します...")
+    start_time_csv = time.time()  # CSV保存の計測開始
 
     # 開始・終了フレーム番号を抽出
     start_frame, end_frame = extract_frame_range_suffix(path_video)
@@ -101,7 +118,10 @@ if __name__ == '__main__':
     # 現在の日時を取得してフォーマット（例: "_20250611_1930"）
     timestamp_str = datetime.now().strftime("_%Y%m%d_%H%M")
     output_dir = os.path.join(video_dir, "phase_csv_frames_" + str(start_frame) + "_" + str(end_frame) + timestamp_str)
+    output_dir = add_tilde_to_filename(output_dir, timestamp)  #* ファイル名の先頭に timestamp を追加（なくてもよい）
+    output_dir = add_tilde_to_filename(output_dir, "~")  #* ファイル名の先頭に '~' を追加（なくてもよい）
     os.makedirs(output_dir, exist_ok=True)
+    
     # ベースとなる src_path を定義（ダミー拡張子でOK）
     base_path = os.path.join(output_dir, "phase.csv")
 
@@ -110,6 +130,33 @@ if __name__ == '__main__':
         suffix = f"_{start_frame + i:04d}"
         save_array(target_phases[i], base_path, suffix, image_format='csv')
 
+    end_time_csv = time.time()  # 終了時刻
+    elapsed_time_csv = end_time_csv - start_time_csv
     print(f"{target_phases.shape[0]} 枚のCSVファイルを {output_dir}/ に保存しました。")
+    print(f"CSV保存時間: {elapsed_time_csv:.2f}秒")
+
+    with open("settings.ini", "r", encoding="utf-8") as f:
+        settings_text = f.read()
+
+    log_path = os.path.join(video_dir, "conversion.log")    
+    log_path = add_tilde_to_filename(log_path, timestamp)  #* ファイル名の先頭に timestamp を追加（なくてもよい）
+    log_path = add_tilde_to_filename(log_path, "~")  #* ファイル名の先頭に '~' を追加（なくてもよい）
     
-    
+
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write("=== 変換時刻 ===\n")
+        f.write(timestamp + "\n")
+        f.write("=== 入力 ===\n")
+        f.write(f"使用プログラム：{sys.argv[0]}\n")
+        f.write(f"リファレンス：{sys.argv[1]}\n")
+        f.write(f"変換動画：{sys.argv[2]}\n")
+        f.write("=== 出力 ===\n")
+        f.write(f"変換動画保存先: {path_video}秒\n")
+        f.write(f"変換処理時間: {elapsed_time_convert:.2f}秒\n")
+        f.write(f"csv保存先: {output_dir}秒\n")
+        f.write(f"csv処理時間: {elapsed_time_csv:.2f}秒\n")
+        f.write("=== 使用した設定ファイル内容 ===\n")
+        f.write(settings_text)
+        f.write("\n=============================\n")
+
+    print(f"ログファイルを {log_path} に保存しました。")

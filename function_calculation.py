@@ -96,3 +96,17 @@ def extract_frame_range_suffix(path):
         raise ValueError("ファイル名に 'frames_XXX_YYY' の形式が含まれていません")
     start, end = map(int, match.groups())
     return start, end
+
+def add_tilde_to_filename(src_path, prefix):
+    """
+    入力パスのファイル名の先頭に '~' を付けた新しいフルパスを返す。
+
+    例:
+        src_path = "C:/data/sample.avi"
+        → "C:/data/~sample.avi"
+    """
+    dir_name = os.path.dirname(src_path)
+    base_name = os.path.basename(src_path)
+    new_base_name = prefix + base_name
+    outpath = os.path.join(dir_name, new_base_name)
+    return outpath
