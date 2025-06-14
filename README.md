@@ -10,12 +10,11 @@ conda activate extract_phase_env環境での動作を確認済み
 - extract_phase_video.pyは入力に「リファレンス画像」「変換動画」を要求しており，「リファレンス画像」がリファレンスとして使用されるため，出力動画のフレーム数は「変換動画」と変わらない．
 
 ## 使い方
-1. `flip_vertically.py`
-   -  `python flip_vertically.py path_to_video.avi`で撮影した`.avi`ファイルに実行して上下逆転．
-2. `extract_frame.py`
-   -  `extract_phase.py path_to_video.avi 1 1`でリファレンス画像を作成
-   -  `extract_phase.py path_to_video.avi start_frame end_frame`で変換動画を作成．
-3. `extract_phase_video.py`
+1. `extract_and_flip.py`
+   -  `extract_and_flip.py path_to_video.avi start_frame end_frame --flip`で撮影した`.avi`ファイルを指定のフレームで切り抜き．`--flip`がついているときは上下逆転．省略可．
+2. `extract_phase_video.py`
    - `extract_phase_video.py path_to_reference.bmp path_to_video.avi`で，位相動画と`phase_csv`フォルダを作成
-4. `calculate_phase.py`
-   - `calculate_phase.py path_to_phase.csv`で，`png`と`bmp`を作成
+3. `calculate_phase.py`
+   - `calculate_phase.py path_to_phase.csv`で，`bmp`を作成（フォルダ内に各フレームごとの変換画像）
+1. `videoplayer.py`
+   - `videoplayer.py path_to_bmpfolder1 path_to_bmpfolder2`で二つのフォルダ内のbmpを比較可能．

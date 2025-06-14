@@ -1,38 +1,66 @@
 import cv2
 import sys
+import os
+import glob
 
-# AVIファイルを読み込み（ファイル名は必要に応じて変更）
-path1 = sys.argv[1]
-path2 = sys.argv[2]
-cap1 = cv2.VideoCapture(path1)
-cap2 = cv2.VideoCapture(path2)
+# フォルダ指定（コマンドライン引数）
+folder1 = sys.argv[1]
+folder2 = sys.argv[2]
 
-# 表示サイズを指定（揃える）
-width, height = 640, 360
+# BMPファイルの一覧を取得
+files1 = sorted(glob.glob(os.path.join(folder1, "*.bmp")))
+files2 = sorted(glob.glob(os.path.join(folder2, "*.bmp")))
+num_frames = min(len(files1), len(files2))
+
+if num_frames == 0:
+    print("画像が見つかりません")
+    sys.exit(1)
+
+# サイズ設定
+resize_width, resize_height = 640, 480
+paused = False
+frame_idx = 0
+seek_request = False
+
+# コールバック関数（シークバー移動時）
+def on_trackbar(val):
+    global frame_idx, paused, seek_request
+    frame_idx = val
+    paused = True
+    seek_request = True  # バー移動時は即座にフレーム更新
+
+# ウィンドウとトラックバーを作成
+cv2.namedWindow("Player")
+cv2.createTrackbar("Position", "Player", 0, num_frames - 1, on_trackbar)
 
 while True:
-    ret1, frame1 = cap1.read()
-    ret2, frame2 = cap2.read()
+    if not paused or seek_request:
+        img1 = cv2.imread(files1[frame_idx])
+        img2 = cv2.imread(files2[frame_idx])
 
-    # どちらかが再生終了したら終了
-    if not ret1 or not ret2:
+        if img1 is None or img2 is None:
+            print(f"読み込み失敗: {files1[frame_idx]} または {files2[frame_idx]}")
+            frame_idx = (frame_idx + 1) % num_frames
+            continue
+
+        img1 = cv2.resize(img1, (resize_width, resize_height))
+        img2 = cv2.resize(img2, (resize_width, resize_height))
+        combined = cv2.hconcat([img1, img2])
+
+        cv2.imshow("Player", combined)
+        cv2.setTrackbarPos("Position", "Player", frame_idx)
+
+        # seek 直後は再生停止に戻す
+        seek_request = False
+
+        if not paused:
+            frame_idx = (frame_idx + 1) % num_frames  # 繰り返し再生
+
+    key = cv2.waitKey(30) & 0xFF
+
+    if key == ord('q'):
         break
+    elif key == ord(' '):
+        paused = not paused
 
-    # サイズを統一
-    frame1 = cv2.resize(frame1, (width, height))
-    frame2 = cv2.resize(frame2, (width, height))
-
-    # 横に並べて結合
-    combined = cv2.hconcat([frame1, frame2])
-
-    # 表示
-    cv2.imshow('Side-by-Side AVI Playback', combined)
-
-    # 30ms待機：qキーで終了
-    if cv2.waitKey(30) & 0xFF == ord('q'):
-        break
-
-# 終了処理
-cap1.release()
-cap2.release()
 cv2.destroyAllWindows()
