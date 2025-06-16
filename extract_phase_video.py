@@ -8,15 +8,14 @@ import re
 from datetime import datetime
 import time
 
-from extract_phase import get_phase, _video2images,get_phase_from_reference, unwrap_phase, save_array, save_video
-from function_calculation import extract_frame_range_suffix, add_tilde_to_filename, find_available_filename
+from extract_phase import get_phase,get_phase_from_reference, unwrap_phase, save_array, save_video, _video2images
+from function_calculation import extract_frame_range_suffix, add_tilde_to_filename, find_available_filename, video2images_rewrite, _video2images, load_video_with_leading_image
 # from function_calculation import loadtext, offset, plot_phase, plot_phase_and_save
 try:
     import cv2
     __HAS_OPENCV__ = True
 except ImportError:
     __HAS_OPENCV__ = False
-
 
 __VIDEO_EXTENSIONS__ = ['.avi', '.mp4']
 
@@ -30,7 +29,7 @@ if __name__ == '__main__':
             'or \nget_phase.py [path/to/video] reference_frames(e.g. 1,2 or 1-10)'
         )
 
-    # #* "20250614_183045" のような日付＋時刻
+    #* "20250614_183045" のような日付＋時刻
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     config = ConfigParser()
@@ -40,17 +39,14 @@ if __name__ == '__main__':
     if ',' in image_format:
         image_format = [img_format.strip() for img_format in image_format.split(',')]
 
-    path_refimages = sys.argv[1]
-    path_video = sys.argv[2]
+    path_refimage = sys.argv[1] #* フレーム数：1枚
+    path_video = sys.argv[2] #* フレーム数：n枚
     video_images = None
     started = time.time()
 
-
-
-
-    dir_ref = os.path.abspath(os.path.dirname(path_refimages))
+    # ディレクトリのチェック
+    dir_ref = os.path.abspath(os.path.dirname(path_refimage))
     dir_video = os.path.abspath(os.path.dirname(path_video))
-
     if dir_ref == dir_video:
         prefix = find_available_filename(path_video)
     else:
@@ -58,27 +54,12 @@ if __name__ == '__main__':
         print(f"  リファレンス画像 のディレクトリ: {dir_ref}")
         print(f"  変換動画 のディレクトリ: {dir_video}")
 
-    cap = cv2.VideoCapture(path_video)
 
-    # フレーム数を取得
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    #* 入力ビデオをバラバラにするlen(video_images) = n
+    video_images = video2images_rewrite(path_video)
+    image = np.array(PIL.Image.open(path_refimage))
 
-    print(f"動画フレーム数: {frame_count}")
-
-    #* sys.argv[1]が動画ファイルの場合、
-    #* 動画ファイルを分解して1フレーム目の画像(image)と画像すべての配列(video_images)を取得
-
-    _ , video_images = _video2images(path_video)
-    image_ref = np.array(PIL.Image.open(path_refimages))
-
-    #* video_imagesをリストに変換し、image_refを先頭に追加
-    #* これにより、入力画像（参照用）を入力動画（変換用）の先頭に入れて一つの動画にする
-    video_images = list(video_images)
-    video_images.insert(0, image_ref)
-    image = video_images[0] # 変換後の動画の位置フレーム目を、参照用として取得
-
-
-
+    print(f"変換動画のフレーム数: {len(video_images)}")
     print("変換を開始します...")
 
     start_time_convert = time.time() # 変換の計測開始
@@ -111,7 +92,8 @@ if __name__ == '__main__':
             float(config['postprocess']['unwrap_phase_min']),
             float(config['postprocess']['unwrap_phase_max'])
         )
-    path_video = add_tilde_to_filename(path_video, prefix)#* ファイル名の先頭に prefix を追加（なくてもよい）
+    #* ファイル名の先頭に prefix を追加（なくてもよい）
+    path_video = add_tilde_to_filename(path_video, prefix)
     save_video(target_phases, path_video, '_phase', video_format='avi')
 
 
@@ -119,6 +101,8 @@ if __name__ == '__main__':
     elapsed_time_convert = end_time_convert - start_time_convert
 
     print("変換が完了しました。")
+    print(f"変換動画保存先: {path_video}")
+    print(f"出力動画フレーム数：{len(target_phases)}")
     print(f"処理時間: {elapsed_time_convert:.2f}秒")
 
     # print(target_phases.shape)

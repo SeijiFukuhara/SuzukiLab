@@ -144,7 +144,7 @@ def save_video(arrays, src_path, suffix, video_format='avi'):
 
 #* [1]のpathが動画ファイルの場合、
 #* 動画を画像に変換し1フレーム目の画像と画像すべての配列を返す関数
-def _video2images(video): 
+def _video2images(video):
     if not __HAS_OPENCV__:
         raise ImportError(
             "Open cv must be installed to read video.\n"
@@ -165,16 +165,6 @@ def _video2images(video):
             image = image[..., 0]
         if success:
             images.append(image)
-
-
-    # while True:
-    #     success, image = vidcap.read()
-    #     if not success:
-    #         break
-    #     image = np.array(image)
-    #     if image.ndim == 3:
-    #         image = image[..., 0]
-    #     images.append(image)
 
     return images[0], images
 

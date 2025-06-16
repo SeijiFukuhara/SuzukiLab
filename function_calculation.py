@@ -157,13 +157,29 @@ def find_available_filename_combination(input_path):
 
     raise FileExistsError(f"{tail_name} に対する ~{letter}1_ 〜 ~{letter}9_ がすべて使用されています。")
 
-def video2images(video): 
-    if not __HAS_OPENCV__:
-        raise ImportError(
-            "Open cv must be installed to read video.\n"
-        )
+#! extract_phse,py中の「def _video2images(video):」は入力が100フレームの時、0～n-2フレーム目（そうフレーム数n-1）までしか出力されない。（意図的かは不明）なので、出力フレーム数（imagesのフレーム数）がn枚になるように新たに関数を定義する。
+def video2images_rewrite(video): 
 
     vidcap = cv2.VideoCapture(video)
+    images = []
+
+    while True:
+        success, image = vidcap.read()
+        if not success:
+            break
+        image = np.array(image)
+        if image.ndim == 3:
+            image = image[..., 0]
+        images.append(image)
+
+    return images
+
+
+
+
+def _video2images(vidcap):
+
+    # vidcap = cv2.VideoCapture(video)
     success, image = vidcap.read() #? 読み込み成功のブール値、読み込んだ画像データ（Numpy配列）
     count = 0
     images = []
@@ -181,3 +197,37 @@ def video2images(video):
 
     return images[0], images
 
+import cv2
+
+def load_video_with_leading_image(image_path, video_path):
+    """
+    .bmp画像を先頭に挿入した動画フレームのリストを返す。
+    動画ファイルや中間ファイルは保存しない。
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise IOError("動画が開けません")
+
+    # 参照画像読み込み
+    image = cv2.imread(image_path)
+    if image is None:
+        raise IOError("画像が読み込めません")
+
+    # 動画と画像のサイズが一致するかチェック
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    if image.shape[:2] != (height, width):
+        raise ValueError(f"画像サイズが動画と一致しません。画像: {image.shape[:2]}, 動画: {(height, width)}")
+
+    # 結果格納用リスト
+    frames = [image]
+
+    # 動画フレームをすべて読み込む
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frames.append(frame)
+
+    cap.release()
+    return frames  # ← NumPy配列のリスト
