@@ -68,12 +68,16 @@ if __name__ == '__main__':
     #* sys.argv[1]が動画ファイルの場合、
     #* 動画ファイルを分解して1フレーム目の画像(image)と画像すべての配列(video_images)を取得
 
-    image, video_images = _video2images(path_video)
+    _ , video_images = _video2images(path_video)
     image_ref = np.array(PIL.Image.open(path_refimages))
 
     #* video_imagesをリストに変換し、image_refを先頭に追加
+    #* これにより、入力画像（参照用）を入力動画（変換用）の先頭に入れて一つの動画にする
     video_images = list(video_images)
     video_images.insert(0, image_ref)
+    image = video_images[0] # 変換後の動画の位置フレーム目を、参照用として取得
+
+
 
     print("変換を開始します...")
 

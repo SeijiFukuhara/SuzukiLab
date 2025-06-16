@@ -8,6 +8,7 @@ import os
 import re
 import string
 import sys
+import cv2
 
 def loadtext(fname):
     fname_load = np.loadtxt(fname, delimiter = ",")
@@ -156,4 +157,27 @@ def find_available_filename_combination(input_path):
 
     raise FileExistsError(f"{tail_name} に対する ~{letter}1_ 〜 ~{letter}9_ がすべて使用されています。")
 
+def video2images(video): 
+    if not __HAS_OPENCV__:
+        raise ImportError(
+            "Open cv must be installed to read video.\n"
+        )
+
+    vidcap = cv2.VideoCapture(video)
+    success, image = vidcap.read() #? 読み込み成功のブール値、読み込んだ画像データ（Numpy配列）
+    count = 0
+    images = []
+    
+    while success:
+        success, image = vidcap.read()
+        image = np.array(image)
+        # here we just use the r channel. Maybe we need something here
+        #? コメントではrチャンネル（RGB配列の0番目を取り出しているから）を使っていると書いているが、BGR配列の可能性もある。
+        #? これはカラー画像をから一つのチャンネルのみを取り出すことで疑似的なグレースケールを創り出す操作をしている。
+        if image.ndim == 3:
+            image = image[..., 0]
+        if success:
+            images.append(image)
+
+    return images[0], images
 
