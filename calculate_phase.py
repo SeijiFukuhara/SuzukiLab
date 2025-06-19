@@ -36,7 +36,6 @@ os.makedirs(output_bmp_folder, exist_ok=True)
 
 start_time_phase = time.time() # 変換の計測開始
 
-
 for fname in sorted(os.listdir(csv_folder)): #? 指定されたフォルダ内の.csvファイルを一つずつ読み取り
     if fname.lower().endswith('.csv'):
         csv_path = os.path.join(csv_folder, fname)
@@ -60,16 +59,6 @@ csv_dir = os.path.dirname(csv_folder)
 
 log_path = os.path.join(csv_dir, "phase.log")
 log_path = add_tilde_to_filename(log_path, prefix)  #* ファイル名の先頭に prefix を追加（なくてもよい）
-
-convolve = True #*移動平均をとるかどうか
-convolve_size_temp = 21 #*移動平均サイズ
-z1 = 500
-z2 = 510
-x1 = 0
-x2 = 20
-
-
-
 
 with open(log_path, "a", encoding="utf-8") as f:
     f.write("=== 変換時刻 ===\n")

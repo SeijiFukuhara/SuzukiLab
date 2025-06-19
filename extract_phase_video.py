@@ -10,7 +10,7 @@ import time
 
 from extract_phase import get_phase,get_phase_from_reference, unwrap_phase, save_array, save_video, _video2images
 from function_calculation import extract_frame_range_suffix, add_tilde_to_filename, find_available_filename, video2images_rewrite, _video2images, load_video_with_leading_image
-# from function_calculation import loadtext, offset, plot_phase, plot_phase_and_save
+
 try:
     import cv2
     __HAS_OPENCV__ = True
@@ -57,6 +57,7 @@ if __name__ == '__main__':
 
     #* 入力ビデオをバラバラにするlen(video_images) = n
     video_images = video2images_rewrite(path_video)
+    #* リファレンス画像を開き、Numpy配列に変換
     image = np.array(PIL.Image.open(path_refimage))
 
     print(f"変換動画のフレーム数: {len(video_images)}")

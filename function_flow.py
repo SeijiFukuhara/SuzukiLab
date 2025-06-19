@@ -225,7 +225,7 @@ def plot_flow_vr_theta(dic):
     plt.legend(loc=1, prop={'family':'MS Gothic','weight':'light','size':30})
     st.pyplot(fig)
     plt.show() #*グラフ表示
-
+'''
 def fit1(data_k,grid_width): #*y = a*np.exp(-c*(x-b)**2) + d*x + e
     def fukuhara_fit(x,a,b,c,d,e):
         #TODO 有効数字の桁数を変えることで結果が大きく変わる
@@ -243,6 +243,37 @@ def fit1(data_k,grid_width): #*y = a*np.exp(-c*(x-b)**2) + d*x + e
         li_y_nobg.append(popt[0]*np.exp(-popt[2]*(num - popt[1])**2) + popt[4])
     li_popt = [popt[0], popt[1], popt[2], popt[3], popt[4]]
     return li_y, li_y_nobg, li_popt
+'''
+def fit1(data_k, grid_width):
+    def fukuhara_fit(x,a,b,c,d,e):
+        y = a*np.exp(-c*(x-b)**2) + d*x + e
+        return y
+
+    # ✅ これで array_x, array_y の長さを一致させる
+    half_width = grid_width // 2
+    if grid_width % 2 == 0:
+        array_x = np.arange(-half_width, half_width)
+    else:
+        array_x = np.arange(-half_width, half_width + 1)
+
+    array_y = np.array(data_k)
+
+    # ✅ 長さが一致していない場合は切り揃え（安全策）
+    min_len = min(len(array_x), len(array_y))
+    array_x = array_x[:min_len]
+    array_y = array_y[:min_len]
+
+    popt, pcov = curve_fit(fukuhara_fit ,array_x, array_y, maxfev=200000, p0=[0.03,8.5,0.0001,0.01,0.00001])
+
+    li_y = []
+    li_y_nobg = []
+    for num in array_x:
+        li_y.append(fukuhara_fit(num, *popt))
+        li_y_nobg.append(popt[0]*np.exp(-popt[2]*(num - popt[1])**2) + popt[4])
+    li_popt = list(popt)
+    return li_y, li_y_nobg, li_popt
+
+
 
 def rep_fit(data,func,grid_height,grid_width):
     li_flow = []

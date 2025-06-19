@@ -14,6 +14,7 @@ import math
 from scipy import integrate
 from datetime import datetime as dt
 from PIL import Image
+# from datetime import datetime
 #!温度計算，流速計算，熱流束計算に必要な関数はそれぞれfunction_temp.py，function_flow.py，function_heat.pyから呼び出し
 
 from function_temp import *
@@ -123,11 +124,11 @@ with tab0:
         # データフレームを表示
         st.write("アップロードされたエクセルファイルの内容：")
         st.dataframe(df)
-
+    st.image("figure\streamlit説明.jpg", caption='Streamlitの使い方', use_container_width=True)
 #!温度分布
 with tab1:
     #st.title('温度分布の算出')
-    tab10, tab11, tab12, tab13, tab14 = st.tabs(["概要", "1.高さ一定の位相", "2.位相分布", "3.温度分布", "4.高さ一定の温度"])
+    tab10, tab11, tab12, tab13, tab14, tab15 = st.tabs(["概要", "1.高さ一定の位相", "2.位相分布", "3.温度分布", "4.高さ一定の温度", "5.LOG"])
 
     #*概要
     with tab10:
@@ -153,13 +154,14 @@ with tab1:
             n_room = refractive(T_room) #*水の常温=室温として，室温における水の屈折率を算出
             width_phase = len(img_phase_array[0]) #*画像の横幅[pix](1024)
             height_phase = len(img_phase_array) #*画像の縦幅[pix](1024)
-            k_extract_pix_phase = height_phase - round(k_extract_microm_phase*d_temp + h0) #*関数近似を行う位置の上端からの距離[pix]0 <= k_extraction <= n (=Nz)
+            k_extract_pix_phase = height_phase - round(k_extract_microm_phase*d_temp + h0) #*関数近似を行う位置の上端からの距離[pix]0 =< k_extraction =< n (=Nz)
             # #!すべてのグラフに関する設定
             # plt.rcParams['xtick.direction'] = 'in' #*x軸目盛を内側に
             # plt.rcParams['ytick.direction'] = 'in' #*y軸目盛を内側に
             # plt.rcParams["font.size"] = 10 #*すべての文字の大きさを統一（必要に応じて変更）
             # plt.rcParams["font.family"] = "Times New Roman"
-            list_x = list(range(-int(width_phase/2),int(width_phase/2)))
+            # list_x = list(range(-int(width_phase/2),int(width_phase/2)))
+            list_x = list(range(-Nx, width_phase - Nx))
             list_x = list(map(lambda x: x/d_temp, list_x)) #*こっちを有効にしたら画像の中心を原点にする
             img_phase_array_apr, img_phase_array_apr2,img_phase_array_apr3,img_phase_array_apr4, list_popt_two = approximation_phase(img_phase_array,n,width_phase,height_phase) #*近似後のデータを取得
             #print(img_phase_array_apr4) #?二次元リスト
@@ -317,6 +319,39 @@ with tab1:
             else:
                 st.markdown("""関数近似した温度分布の高さ一定の分布を表示""")
 
+    with tab15:
+        # --- アプリで使う変数（例） ---
+        user_name = "Seiji Fukuhara"
+        selected_option = "オプションB"
+        calculated_value = 42.195
+
+        # --- 表示する変数を辞書などでまとめる ---
+        variables = {
+            "ユーザー名": user_name,
+            "選択肢": selected_option,
+            "計算結果": calculated_value
+        }
+
+        # --- 画面に表示 ---
+        st.title("プログラム中の変数の可視化と保存")
+
+        st.subheader("現在の変数の値")
+        for key, value in variables.items():
+            st.text(f"{key}: {value}")
+
+        # --- テキストにまとめる ---
+        log_content = "\n".join([f"{key}: {value}" for key, value in variables.items()])
+
+        # --- 保存ボタン ---
+        st.download_button(
+            label="変数の値を保存",
+            data=log_content,
+            file_name=f"variables_{dt.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            mime="text/plain"
+        )
+
+
+
 #!流速分布
 with tab2:
     tab20, tab21, tab22, tab23 = st.tabs(["概要", "1.高さ一定の流速", "2.流速カラーマップ", "3.Vr-Thetaグラフ"])
@@ -327,7 +362,7 @@ with tab2:
         st.markdown("""##### ImageJにおける格子点（画像左上が原点）をIJ格子点[pix]，FlowExpertにおける格子点（画像左下が原点）をFE格子点[pix]と呼ぶことにする。""")
         st.markdown("""何をしているか？まず得られた流速分布のデータ（FlowExpert）から各高さに対して１ピクセルずつ関数近似を行う．これは各高さにおける分布の中心を求めるためで，分布全体をきれいにフィッティングしたいわけではない．流速分布がきれいに取れなかった場合は左右対称な分布から大きく外れるので，近似した関数は必ずしもきれいにフィットするとは限らない．しかし，関数近似によって得られた中心は，測定した分布の中心と一致すると考えることにする．その後ある高さにおける流速分布を先ほど得た中心位置を基準に片側だけプロットし，これに対して関数近似を行う．今回は分布全体にきれいにフィッティングさせることを目標にする．この場合の関数は必ずしも頂点（原点）での微分係数が０である必要はないのか？？こうして得られた関数をある高さにおける流速分布の近似関数とする．""")
         if fname_flow is not None:
-            #!phase.csvの読み込み
+            #!flow.csvの読み込み
             li_T_f = flow_calculate(fname_flow)
             grid_width = li_width(li_T_f)
             grid_height = li_height(li_T_f)
@@ -341,7 +376,7 @@ with tab2:
 
             ar_flow_y_apr, ar_flow_y_apr_nobg, ar_popt = rep_fit(li_flow_y,fit1,grid_height,grid_width) #?(y1)を関数fit1で近似した(y3)
 
-            ar_flow_y_convolve_apr, ar_flow_y_convolve_apr_nobg,  ar_popt_convolve = rep_fit(li_flow_y_convolve,fit1,grid_height, grid_width) #?(y2)を関数fit1で近似した(y4)
+            # ar_flow_y_convolve_apr, ar_flow_y_convolve_apr_nobg,  ar_popt_convolve = rep_fit(li_flow_y_convolve,fit1,grid_height, grid_width) #?(y2)を関数fit1で近似した(y4)
 
             k_extract_pix_flow = int(k_extract_microm_flow*d_flow)+y0
 
