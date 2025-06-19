@@ -359,17 +359,19 @@ with tab2:
     #*概要
     with tab20:
         st.markdown("""## 概要""")
-        st.markdown("""##### ImageJにおける格子点（画像左上が原点）をIJ格子点[pix]，FlowExpertにおける格子点（画像左下が原点）をFE格子点[pix]と呼ぶことにする。""")
-        st.markdown("""何をしているか？まず得られた流速分布のデータ（FlowExpert）から各高さに対して１ピクセルずつ関数近似を行う．これは各高さにおける分布の中心を求めるためで，分布全体をきれいにフィッティングしたいわけではない．流速分布がきれいに取れなかった場合は左右対称な分布から大きく外れるので，近似した関数は必ずしもきれいにフィットするとは限らない．しかし，関数近似によって得られた中心は，測定した分布の中心と一致すると考えることにする．その後ある高さにおける流速分布を先ほど得た中心位置を基準に片側だけプロットし，これに対して関数近似を行う．今回は分布全体にきれいにフィッティングさせることを目標にする．この場合の関数は必ずしも頂点（原点）での微分係数が０である必要はないのか？？こうして得られた関数をある高さにおける流速分布の近似関数とする．""")
+        st.markdown("""##### ImageJにおける格子点（画像左上が原点）をIJ格子点[pix]，FlowExpertにおける格子点（画像左下が原点）をFE格子点と呼ぶことにする。""")
+        st.markdown("""何をしているか？まず得られた流速分布のデータ（FlowExpert）から各高さに対して１ピクセルずつ関数近似を行う．これは各高さにおける分布の中心を求めるためで，分布全体をきれいにフィッティングしたいわけではない．流速分布がきれいに取れなかった場合は左右対称な分布から大きく外れるので，近似した関数は必ずしもきれいにフィットするとは限らない．しかし，関数近似によって得られた中心は，測定した分布の中心と一致すると考えることにする．その後ある高さにおける流速分布を先ほど得た中心位置を基準に片側だけプロットし，これに対して関数近似を行う．今回は分布全体にきれいにフィッティングさせることを目標にする．この場合の関数は必ずしも頂点（原点）での微分係数が０である必要はないのか？？こうして得られた関数をあ る高さにおける流速分布の近似関数とする．""")
+        st.markdown("""##### 注意点""")
+        st.markdown("""flow_expertで格子点1で解析をしたからといって、必ずしも流速動画.aviのピクセル幅、高さと一致するとは限らない。""")
         if fname_flow is not None:
             #!flow.csvの読み込み
             li_T_f = flow_calculate(fname_flow)
             grid_width = li_width(li_T_f)
             grid_height = li_height(li_T_f)
             coordinates_gridpoint, gridpoint_velocity, x0, y0 = grid(li_T_f)
-            dic_theta_vr, number  = dic_theta_vr(r_min_flow, r_max_flow,gridpoint_velocity, x0,y0) #*キーにtheta、バリューにvrの辞書を作成
-            li_flow_x = flow_xy(4, grid_height, grid_width, li_T_f) #?x方向の流速の２次元リスト(x1)
-            li_flow_y = flow_xy(5, grid_height, grid_width, li_T_f) #?y方向の流速の２次元リスト(y1)
+            dic_theta_vr, number  = make_dic_theta_vr(r_min_flow, r_max_flow,gridpoint_velocity, x0,y0) #*キーにtheta、バリューにvrの辞書を作成
+            li_flow_x = flow_xy(4, grid_height, grid_width, li_T_f) #? x方向の流速の２次元リスト(x1)
+            li_flow_y = flow_xy(5, grid_height, grid_width, li_T_f) #? y方向の流速の２次元リスト(y1)
 
             li_flow_x_convolve = rep_convolve(li_flow_x, valid_convolve, convolve_size_flow) #?(x1)に移動平均かけた(x2)
             li_flow_y_convolve = rep_convolve(li_flow_y, valid_convolve, convolve_size_flow) #?(y1)に移動平均かけた(y2)

@@ -45,7 +45,7 @@ def origin_gridpoint(di):
     di2 = di[(float(0), float(0))]
     return [di2[0], di2[1]]
 
-def dic_theta_vr(r0, r1, gridpoint_velocity, x0, y0): #*キーにtheta、値にvrの入った辞書(dic_theta_vr)を作成
+def make_dic_theta_vr(r0, r1, gridpoint_velocity, x0, y0): #*キーにtheta、値にvrの入った辞書(dic_theta_vr)を作成
     theta = 0
     di = {}
     number = 0
