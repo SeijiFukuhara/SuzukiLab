@@ -19,7 +19,6 @@ from PIL import Image
 
 from function_temp import *
 from function_flow import *
-from function_temp import *
 from function_heatflux import *
 
 #?このサイト全体のタイトル

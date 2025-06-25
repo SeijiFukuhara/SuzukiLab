@@ -40,10 +40,12 @@ for fname in sorted(os.listdir(csv_folder)): #? 指定されたフォルダ内�
     if fname.lower().endswith('.csv'):
         csv_path = os.path.join(csv_folder, fname)
         img_phase_array = loadtext(csv_path)
+        #* offset処理を行い、位相画像をarrayにする
         img_phase_array_offset = offset(img_phase_array, convolve,convolve_size_temp,z1,z2,x1,x2)
 
         # 保存先のパスを設定（入力CSV名と同じ名前で .bmp にする）
         # output_path = fname_phase.replace('.csv', '.bmp')
+        #* 画像を保存する
         plot_phase_and_save(img_phase_array_offset, d_temp,csv_path, output_bmp_folder)
 
 

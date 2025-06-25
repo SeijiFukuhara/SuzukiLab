@@ -9,6 +9,7 @@ import re
 import string
 import sys
 import cv2
+from scipy.optimize import curve_fit
 
 def loadtext(fname):
     fname_load = np.loadtxt(fname, delimiter = ",")
@@ -28,7 +29,7 @@ def plot_phase(np_array,d_temp):
     # plt.savefig(figname)
     # plt.show()
 
-def offset(twolist_array,convolve,convolve_size_temp,z1,z2,x1,x2): #*水温と室温が一致する範囲を指定し，オフセット
+def offset(twolist_array,convolve_size_temp,z1,z2,x1,x2,convolve): #*水温と室温が一致する範囲を指定し，オフセット
     #*以下の段落をコメントアウトしているときは[from scipy import signal]の行に「アクセスできません」というメッセージが表示されるが問題ない
     #TODO 移動平均とる場合は以下最初の空行までを有効にする
     # xxに対してsize個での移動平均を取る
@@ -174,9 +175,6 @@ def video2images_rewrite(video):
 
     return images
 
-
-
-
 def _video2images(vidcap):
 
     # vidcap = cv2.VideoCapture(video)
@@ -231,3 +229,80 @@ def load_video_with_leading_image(image_path, video_path):
 
     cap.release()
     return frames  # ← NumPy配列のリスト
+
+
+
+###############################################################################################################
+#! 温度分布
+#*位相のカラーマップを表示する関数
+def plot_phase(np_array,d_temp):
+    fig = plt.figure()
+    plt.imshow(np_array, cmap="rainbow")
+    plt.axis('off')
+    cbar = plt.colorbar()
+    cbar.set_label( "Corrected Phase [rad]", fontsize=14)
+    plt.clim(0,3.0)
+    scalebar = ScaleBar(1/d_temp,'um', location = "lower right", length_fraction = 0.2, font_properties={"size": 20}) #*字大きい，位置違う
+    #scalebar = ScaleBar(1/d,'um', location = "upper left") #*1 pixel = ? um もともとの設定
+    plt.gca().add_artist(scalebar)
+    # figname = fname.replace('.csv', '.png') #*保存先のパス．元データのcsvファイルと全く同じファイル名で保存する設定．
+    # plt.savefig(figname)
+    return fig
+
+def y0(x,popt):
+    y0 = popt[0]*np.exp(-popt[2]*(x - popt[1])**2) + x*popt[3] + popt[4]
+    return y0
+
+def y1(x,popt):
+    y1 = popt[0]*np.exp(-popt[2]*(x - popt[1])**2)
+    return y1
+
+def y2(x,popt):
+    y2 = popt[0]*np.exp(-popt[2]*x**2)
+    return y2
+
+def y3(x,popt):
+    y3 = -popt[0]*np.exp(-popt[2]*x**2)
+    return y3
+
+def approximation_phase(twolist_array,n,width_phase,height_phase):
+    popt_full = np.array([]).reshape(0, 5)  # (0, 5) の空配列
+    width_phase_half = width_phase//2 # width_phaseが奇数の場合はエラー出ると思う
+    array_x = np.tile(np.array(list(range(-width_phase_half,width_phase_half))), (n,1))
+    '''
+    width_phase_half = 4、n = 3のとき
+    array_x = [[-4 -3 -2 -1  0  1  2  3]
+    [-4 -3 -2 -1  0  1  2  3]
+    [-4 -3 -2 -1  0  1  2  3]]
+    <class 'numpy.ndarray'>
+    '''
+    def fukuhara_fit(x,a,b,c,d,e):
+        #TODO 有効数字の桁数を変えることで結果が大きく変わる
+        y = a*np.exp(-c*(x-b)**2) + x*d + e
+        return y
+
+    popt_full_list = []
+    for i in range(n):
+        array_y = np.array(twolist_array[i])
+        popt, _ = curve_fit(fukuhara_fit, array_x[0], array_y, maxfev=20000, p0=[1.5, 0, 0.0001, 0.0001, 0.00001])
+        popt_full_list.append(popt)  # popt をリストに追加
+
+    popt_full = np.array(popt_full_list) # <class 'list'> -> <class 'nd.aray'>
+    p0, p1, p2, p3, p4 = np.split(popt_full, 5, axis=1)
+    popt_columns = [p0, p1, p2, p3, p4]
+    '''
+    popt_full_list = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]] のとき、
+    popt_columns = [array([[ 1],[ 4],[ 7],[10]]), array([[ 2],[ 5],[ 8],[11]]), array([[ 3],[ 6],[ 9],[12]])]
+    popt_full_listの要素を各列ごとにまとめている
+    '''
+    phase_full = np.zeros((4, width_phase, height_phase))  # 4つのフェーズデータをまとめて作成
+
+    # y0, y1, y2, y3 をリストに格納
+    y_functions = [y0, y1, y2, y3]
+
+    # 各フェーズデータを計算し、対応する配列に格納
+    for i, y_func in enumerate(y_functions):
+        phase_partial = y_func(array_x, popt_columns)
+        phase_full[i, :n, :] = phase_partial
+
+    return phase_full, popt_full
