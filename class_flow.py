@@ -16,7 +16,7 @@ import streamlit as st
 #! 格子間隔は1[pix]の前提。そうでない場合は改変の必要あり。
 class FlowAnalyzer:
     #!__init__() 内で self.なしで変数を定義することは可能だが、原則として推奨されない。
-    def __init__(self, csv_file, d_micro_to_pix_flow, k_extract_microm_flow, adjust_x_grid, convolve_size_flow, debug_k_pix, use_k_pix):
+    def __init__(self, csv_file, d_micro_to_pix_flow, k_extract_microm_flow, adjust_x_grid, convolve_size_flow, debug_k_pix, microm_or_pix):
 
         self.path = csv_file
         self.d_micro_to_pix_flow = d_micro_to_pix_flow #* 流速分布観察カメラの1umあたりのpixel d[pixel/μm]
@@ -37,48 +37,15 @@ class FlowAnalyzer:
 
         #* 流速計算
         #? pixを直接指定するか、μmを指定するか選択
-        if use_k_pix:
-            self.k_extract_pix_flow = debug_k_pix
-        else:
+        if microm_or_pix == "k_extract_microm_flow[μm]":
             self.k_extract_pix_flow = int(self.k_extract_microm_flow * self.d_micro_to_pix_flow) + self.y0_grid
+        elif microm_or_pix == "debug_k_pix[pix]":
+            self.k_extract_pix_flow = debug_k_pix
         #? x方向とy方向の流速を、FE座標で取得
         self.flow_vx = self.flow_xy(4)
         self.flow_vy = self.flow_xy(5)
         #? y方向の流速の辞書を取得
         self.flow_vy_nest_dict = self.flow_nest_dict(self.flow_vy)
-        # #? 平滑化、フィッティングの流速を取得
-        # self.df_flow, self.df_flow_k, self.df_flow_k_half = self.fit_convolve(self.flow_vy)
-        # #? x方向とy方向をフィッティングした流速を、FE座標で取得
-        # # self.flow_vx_convolve = self.rep_convolve(self.flow_vx, self.valid_convolve, 21)
-        # self.flow_vy_convolve = self.rep_convolve(self.flow_vy, self.valid_convolve)
-        # #? x方向とy方向の平滑化をフィッティングした流速を、FE座標で取得
-        # # self.flow_vx_fit, self.flow_vx_fit_nobug = self.fit_repeat(self.flow_vx)
-        # self.flow_vy_fit, self.flow_vy_fit_nobug = self.fit_repeat(self.flow_vy)
-        # #? x方向とy方向の平滑化をフィッティングした流速を、FE座標で取得
-        # # self.flow_vx_convolve_fit, self.flow_vx_convolve_fit_nobug = self.fit_repeat(self.flow_vx_convolve)
-        # self.flow_vy_convolve_fit, self.flow_vy_convolve_fit_nobug = self.fit_repeat(self.flow_vy_convolve)
-        # #? 指定された高さの流速を取得
-        # self.flow_vy_k, self.k_grid = self.extract_flow(self.flow_vy)
-        # self.flow_vy_convolve_k, self.k_grid = self.extract_flow(self.flow_vy_convolve)
-        # self.flow_vy_fit_k, self.k_grid = self.extract_flow(self.flow_vy_fit)
-        # self.flow_vy_convolve_fit_k, self.k_grid = self.extract_flow(self.flow_vy_convolve_fit)
-        # #! 対称軸片側（右側）領域への処理
-
-        # #? x方向とy方向の平滑化した流速を、FE座標で取得
-        # self.flow_vx_convolve = self.rep_convolve(self.flow_vx, self.valid_convolve)
-        # self.flow_vy_convolve = self.rep_convolve(self.flow_vy, self.valid_convolve)
-        # #? x方向とy方向の平滑化をフィッティングした流速を、FE座標で取得
-        # # self.flow_vx_fit, self.flow_vx_fit_nobug = self.fit_repeat(self.flow_vx)
-        # self.flow_vy_fit, self.flow_vy_fit_nobug = self.fit_repeat(self.flow_vy)
-        # #? x方向とy方向の平滑化をフィッティングした流速を、FE座標で取得
-        # # self.flow_vx_convolve_fit, self.flow_vx_convolve_fit_nobug = self.fit_repeat(self.flow_vx_convolve)
-        # self.flow_vy_convolve_fit, self.flow_vy_convolve_fit_nobug = self.fit_repeat(self.flow_vy_convolve)
-        # #? 指定された高さの流速を取得
-        # self.flow_vy_k, self.k_grid = self.extract_flow(self.flow_vy)
-        # self.flow_vy_convolve_k, self.k_grid = self.extract_flow(self.flow_vy_convolve)
-        # self.flow_vy_fit_k, self.k_grid = self.extract_flow(self.flow_vy_fit)
-        # self.flow_vy_convolve_fit_k, self.k_grid = self.extract_flow(self.flow_vy_convolve_fit)
-
 
     #* 読み取ったcsvファイルを、計算に使えるように処理
     def _prepare_data(self):
@@ -162,12 +129,9 @@ class FlowAnalyzer:
         ar_flow, ar_flow_nobg, ar_popt = tuple(np.stack(parts) for parts in zip(*results))
         return ar_flow, ar_flow_nobg
 
-    def extract_flow(self, ar):
-        # k_extract_grid_flow = int(self.k_extract_microm_flow*self.d_micro_to_pix)+self.y0
-        # k_extract_grid_flow = self.k_extract_grid_flow
-        return ar[self.k_extract_grid_flow-1], self.k_extract_grid_flow
-
     def flow_nest_dict(self, v_2d):
+        #? 流速をFE座標で取得
+        self.flow_v = v_2d
         #? 平滑化した流速を、FE座標で取得
         self.flow_v_convolve = self.rep_convolve(v_2d, self.valid_convolve)
         #? フィッティングした流速を、FE座標で取得
@@ -176,6 +140,7 @@ class FlowAnalyzer:
         self.flow_v_convolve_fit, self.flow_v_convolve_fit_nobug = self.fit_repeat(v_2d)
         flow_dict = {
             'x': self.x_axis_grid,
+            'flow_v': self.flow_v,
             'flow_v_convolve': self.flow_v_convolve,
             'flow_v_fit': self.flow_v_fit,
             'flow_v_convolve_fit': self.flow_v_convolve_fit,
@@ -186,21 +151,23 @@ class FlowAnalyzer:
         #? 指定された高さの流速を取得
         flow_k_dict = {
             'x': self.x_axis_grid,
-            'flow_v_convolve_k': self.flow_v_convolve[self.k_extract_pix_flow],
-            'flow_v_fit_k': self.flow_v_fit[self.k_extract_pix_flow],
-            'flow_v_convolve_fit_k': self.flow_v_convolve_fit[self.k_extract_pix_flow],
-            'flow_v_fit_nobug_k': self.flow_v_fit_nobug[self.k_extract_pix_flow],
-            'flow_v_convolve_fit_nobug_k': self.flow_v_convolve_fit_nobug[self.k_extract_pix_flow]
+            'flow_v_k': self.flow_v[self.k_extract_pix_flow-1],
+            'flow_v_convolve_k': self.flow_v_convolve[self.k_extract_pix_flow-1],
+            'flow_v_fit_k': self.flow_v_fit[self.k_extract_pix_flow-1],
+            'flow_v_convolve_fit_k': self.flow_v_convolve_fit[self.k_extract_pix_flow-1],
+            'flow_v_fit_nobug_k': self.flow_v_fit_nobug[self.k_extract_pix_flow-1],
+            'flow_v_convolve_fit_nobug_k': self.flow_v_convolve_fit_nobug[self.k_extract_pix_flow-1]
         }
 
         #? 指定された高さの片側の流速を取得
         flow_k_divided_dict = {
             'x': self.x_axis_grid[self.x0_new:],
-            'flow_v_convolve_k_divided': self.flow_v_convolve[self.k_extract_pix_flow][self.x0_new:],
-            'flow_v_fit_k_divided': self.flow_v_fit[self.k_extract_pix_flow][self.x0_new:],
-            'flow_v_convolve_fit_k_divided': self.flow_v_convolve_fit[self.k_extract_pix_flow][self.x0_new:],
-            'flow_v_fit_nobug_k_divided': self.flow_v_fit_nobug[self.k_extract_pix_flow][self.x0_new:],
-            'flow_v_convolve_fit_nobug_k_divided': self.flow_v_convolve_fit_nobug[self.k_extract_pix_flow][self.x0_new:]
+            'flow_v_k_divided': self.flow_v[self.k_extract_pix_flow-1][self.x0_new:],
+            'flow_v_convolve_k_divided': self.flow_v_convolve[self.k_extract_pix_flow-1][self.x0_new:],
+            'flow_v_fit_k_divided': self.flow_v_fit[self.k_extract_pix_flow-1][self.x0_new:],
+            'flow_v_convolve_fit_k_divided': self.flow_v_convolve_fit[self.k_extract_pix_flow-1][self.x0_new:],
+            'flow_v_fit_nobug_k_divided': self.flow_v_fit_nobug[self.k_extract_pix_flow-1][self.x0_new:],
+            'flow_v_convolve_fit_nobug_k_divided': self.flow_v_convolve_fit_nobug[self.k_extract_pix_flow-1][self.x0_new:]
         }
 
         #? ネストされた辞書を作成
@@ -272,77 +239,3 @@ class FlowAnalyzer:
         )
         return report
     '''
-
-
-
-# In[101]:
-
-
-# uploaded_file = r"sample.csv"
-# d_micro_to_pix = 1.0269 #*流速分布観察カメラの1umあたりのpixel d[pixel/μm]
-# k_extract_microm_flow = 100 #*流速分布観察で抽出するy座標の高さ [μm]
-# adjust_x_grid = 0 #*グリッドのx座標を調整する値 [pix]
-# convolve_size_flow = 21 #*流速分布観察での平滑化に使用するカーネルサイズ [pix]
-
-
-# In[102]:
-
-
-# flow = FlowAnalyzer(uploaded_file, d_micro_to_pix, k_extract_microm_flow, adjust_x_grid, convolve_size_flow)
-# # print(flow.df_flow)
-# # flow.df_flow
-# flow.df_T_replace
-
-
-# In[103]:
-
-
-# print(flow.width_grid)
-# print(flow.height_grid)
-
-
-# In[104]:
-
-
-# print(type(flow.flow_vy_fit))  # ← None であれば未設定です
-# print(flow.flow_vy_fit)  # ← None であれば未設定です
-# print(flow.flow_vy_k)  # ← None であれば未設定です
-# print(flow.k_grid)  # ← None であれば未設定です
-
-
-# In[105]:
-
-
-# plt.plot(flow.array_x, flow.flow_vy_k, label="data1")
-# plt.plot(flow.array_x, flow.flow_vy_convolve_k, label="data2")
-# plt.plot(flow.array_x, flow.flow_vy_fit_k, label="data3")
-# plt.plot(flow.array_x, flow.flow_vy_convolve_fit_k, label="data4")
-# plt.axhline(y=0, color='k', linestyle='--')  # vy=0の水平線を引く
-# plt.legend(loc='upper right',fontsize = 9)
-# plt.tick_params(labelsize=10)
-# plt.title(f"Flow Velocity at Specified Height {flow.k_grid} ")
-# plt.legend()
-# plt.show()
-
-
-# In[106]:
-
-
-# x_right_half_grid = flow.x0_grid + flow.adjust_x_grid
-# plt.plot(flow.array_x[x_start_grid:], flow.flow_vy_k[x_start_grid:], label="data1")
-# plt.plot(flow.array_x[x_start_grid:], flow.flow_vy_convolve_k[x_start_grid:], label="data2")
-# plt.plot(flow.array_x[x_start_grid:], flow.flow_vy_fit_k[x_start_grid:], label="data3")
-# plt.plot(flow.array_x[x_start_grid:], flow.flow_vy_convolve_fit_k[x_start_grid:], label="data4")
-# plt.title(f"Flow Velocity at Specified Height {flow.k_grid}_rightside ")
-# plt.axhline(y=0, color='k', linestyle='--')  # vy=0の水平線を引く
-# plt.legend(loc='upper right',fontsize = 9)
-# plt.tick_params(labelsize=10)
-# plt.legend()
-# plt.show()
-
-
-# In[ ]:
-
-
-
-
