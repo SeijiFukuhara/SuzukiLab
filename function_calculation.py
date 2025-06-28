@@ -249,21 +249,33 @@ def plot_phase(np_array,d_temp):
     # plt.savefig(figname)
     return fig
 
-def y0(x,popt):
-    y0 = popt[0]*np.exp(-popt[2]*(x - popt[1])**2) + x*popt[3] + popt[4]
-    return y0
+# def y0(x,popt):
+#     y0 = popt[0]*np.exp(-popt[2]*(x - popt[1])**2) + x*popt[3] + popt[4]
+#     return y0
 
-def y1(x,popt):
-    y1 = popt[0]*np.exp(-popt[2]*(x - popt[1])**2)
-    return y1
+# def y1(x,popt):
+#     y1 = popt[0]*np.exp(-popt[2]*(x - popt[1])**2)
+#     return y1
 
-def y2(x,popt):
-    y2 = popt[0]*np.exp(-popt[2]*x**2)
-    return y2
+# def y2(x,popt):
+#     y2 = popt[0]*np.exp(-popt[2]*x**2)
+#     return y2
 
-def y3(x,popt):
-    y3 = -popt[0]*np.exp(-popt[2]*x**2)
-    return y3
+# def y3(x,popt):
+#     y3 = -popt[0]*np.exp(-popt[2]*x**2)
+#     return y3
+
+def y0(x, A, mu, sigma, m, b):
+    return A * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2)) + m * x + b
+
+def y1(x, A, mu, sigma):
+    return A * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
+
+def y2(x, A, sigma):
+    return A * np.exp(-(x ** 2) / (2 * sigma ** 2))
+
+def y3(x, A, sigma):
+    return -A * np.exp(-(x ** 2) / (2 * sigma ** 2))
 
 def approximation_phase(twolist_array,n,width_phase,height_phase):
     popt_full = np.array([]).reshape(0, 5)  # (0, 5) の空配列
@@ -276,18 +288,27 @@ def approximation_phase(twolist_array,n,width_phase,height_phase):
     [-4 -3 -2 -1  0  1  2  3]]
     <class 'numpy.ndarray'>
     '''
-    def fukuhara_fit(x,a,b,c,d,e):
+
+    def func_original(x, A, mu, sigma, m, b):
         #TODO 有効数字の桁数を変えることで結果が大きく変わる
-        y = a*np.exp(-c*(x-b)**2) + x*d + e
-        return y
+        return A * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2)) + m * x + b
+
+    def estimate_initial_gaussian_params(x, y):
+        A_init = np.max(y)
+        mu_init = np.sum(x * y) / np.sum(y)
+        sigma_init = np.sqrt(np.sum(y * (x - mu_init)**2) / np.sum(y))
+        sigma_init = max(sigma_init, 1e-6)  # 0や小さすぎる値を防ぐ
+        return A_init, mu_init, sigma_init
 
     popt_full_list = []
     for i in range(n):
         array_y = np.array(twolist_array[i])
-        popt, _ = curve_fit(fukuhara_fit, array_x[0], array_y, maxfev=20000, p0=[1.5, 0, 0.0001, 0.0001, 0.00001])
+        #* 初期パラメータの推定
+        A_init, mu_init, sigma_init = estimate_initial_gaussian_params(array_x[0], array_y)
+        popt, _ = curve_fit(func_original, array_x[0], array_y, maxfev=20000, p0=[A_init, mu_init, sigma_init, 0.001, 0.0001])
         popt_full_list.append(popt)  # popt をリストに追加
 
-    popt_full = np.array(popt_full_list) # <class 'list'> -> <class 'nd.aray'>
+    popt_full = np.array(popt_full_list) # <class 'list'> -> <class 'nd.array'>
     p0, p1, p2, p3, p4 = np.split(popt_full, 5, axis=1)
     popt_columns = [p0, p1, p2, p3, p4]
     '''
@@ -295,14 +316,29 @@ def approximation_phase(twolist_array,n,width_phase,height_phase):
     popt_columns = [array([[ 1],[ 4],[ 7],[10]]), array([[ 2],[ 5],[ 8],[11]]), array([[ 3],[ 6],[ 9],[12]])]
     popt_full_listの要素を各列ごとにまとめている
     '''
-    phase_full = np.zeros((4, width_phase, height_phase))  # 4つのフェーズデータをまとめて作成
+    phase_full = np.zeros((4, n, width_phase))  # 4つのフェーズデータをまとめて作成
+    # phase_full = np.zeros((4, width_phase, height_phase))  # 4つのフェーズデータをまとめて作成
 
     # y0, y1, y2, y3 をリストに格納
     y_functions = [y0, y1, y2, y3]
 
     # 各フェーズデータを計算し、対応する配列に格納
     for i, y_func in enumerate(y_functions):
-        phase_partial = y_func(array_x, popt_columns)
-        phase_full[i, :n, :] = phase_partial
+        for j in range(n):
+            A, mu, sigma, m, b = popt_full[j]
+            if y_func == y0:
+                y_values = y0(array_x[j], A, mu, sigma, m, b)
+            elif y_func == y1:
+                y_values = y1(array_x[j], A, mu, sigma)
+            elif y_func == y2:
+                y_values = y2(array_x[j], A, sigma)
+            elif y_func == y3:
+                y_values = y3(array_x[j], A, sigma)
+            phase_full[i, j, :] = y_values  # 横方向に格納
+            # phase_partial = y_func(array_x, popt_columns)
+            # phase_full[i, :n, :] = phase_partial
 
     return phase_full, popt_full
+
+
+

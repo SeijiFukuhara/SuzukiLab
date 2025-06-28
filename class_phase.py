@@ -35,5 +35,10 @@ class PhaseAnalyzer:
         self.img_phase_array_offset_convolve = offset(img_phase_array, self.convolve_size_temp, self.z1, self.z2, self.x1, self.x2, convolve = True)
         self.fig_offset_convolve = plot_phase(self.img_phase_array_offset_convolve, self.d_micro_to_pix_temp)
 
-        # self.phase_full, self.popt_full = approximation_phase(self.img_phase_array_offset_convolve,self.n,self.width_phase,self.height_phase)
-        # self.fig_offset_convolve_apr = plot_phase(self.phase_full[0], self.d_micro_to_pix_temp)
+        try:
+            self.phase_full, self.popt_full = approximation_phase(self.img_phase_array_offset_convolve,self.n,self.width_phase,self.height_phase)
+            self.fig_offset_convolve_apr = plot_phase(self.phase_full[0], self.d_micro_to_pix_temp)
+        except Exception as e:
+            # 例外が発生したときの処理
+            self.error_msg = str(e)
+            # print("近似がうまくいかなかった")

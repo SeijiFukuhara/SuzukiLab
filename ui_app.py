@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from class_phase import PhaseAnalyzer
 from class_flow import FlowAnalyzer
 
-st.title("FlowAnalyzer Streamlit Viewer")
+st.title("熱流束")
 
 with st.sidebar:
     #!ファイル入力
@@ -115,7 +115,7 @@ with st.sidebar:
 
 tab01, tab02, tab03, tab04 = st.tabs(["1.位相分布","2.温度分布", "3.流速分布", "4.熱流束"])
 
-#! 温度分布のタブ
+#! 位相分布のタブ
 with tab01:
     if fname_phase is not None:
         temp_phase_path = "temp_uploaded.csv"
@@ -132,7 +132,7 @@ with tab01:
                 z2=z2,
                 x1=x1,
                 x2=x2,
-                n = Nz
+                n = Nx
             )
 
         except Exception as e:
@@ -142,16 +142,45 @@ with tab01:
         st.warning("phase.csvファイルをアップロードしてください。")
 
     tab10, tab11 = st.tabs(["図", "csv"])
-
+    #* 位相分布の図
     with tab10:
         if fname_phase is not None:
+            st.markdown("""### offset""")
             st.pyplot(phaseanalyzer.fig_offset)
+            st.markdown("""### offset_convolve""")
             st.pyplot(phaseanalyzer.fig_offset_convolve)
-            # st.pyplot(phaseanalyzer.fig_offset_convolve_apr)
+            fig = plt.figure()
+            plt.plot(phaseanalyzer.img_phase_array_offset_convolve[0], color ='blue')
+            plt.plot(phaseanalyzer.img_phase_array_offset_convolve[800], color ='red')
+            st.pyplot(fig)
+            st.markdown("""### offset_convolve_apr""")
+            if hasattr(phaseanalyzer, 'error_msg') and phaseanalyzer.error_msg:
+                st.write("関数近似にエラーが発生:", phaseanalyzer.error_msg)
+            else:
+                fig = phaseanalyzer.fig_offset_convolve_apr
+                # たとえば matplotlib で表示するなら
+                # import matplotlib.pyplot as plt
+                # plt.figure(fig.number).
+                # plt.show()
+                st.pyplot(fig)
+                df = pd.DataFrame(phaseanalyzer.phase_full[0])
+                st.dataframe(df)
+                # st.write(phaseanalyzer.fig_offset_convolve_apr)
+                df = pd.DataFrame(phaseanalyzer.popt_full) # shape = (4, 1024))
+                st.dataframe(df)
 
+    #* 位相分布のcsv
     with tab11:
         if fname_phase is not None:
-            st.write(phaseanalyzer.df)
+            st.markdown("""### offset""")
+            st.dataframe(pd.DataFrame(phaseanalyzer.img_phase_array_offset))
+            st.markdown("""### offset_convolve""")
+            st.dataframe(pd.DataFrame(phaseanalyzer.img_phase_array_offset_convolve))
+            st.markdown("""### offset_convolve_apr""")
+            st.dataframe(pd.DataFrame(phaseanalyzer.phase_full[0]))
+
+
+
 
 
 
