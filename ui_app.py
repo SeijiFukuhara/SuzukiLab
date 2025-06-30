@@ -28,10 +28,10 @@ with st.sidebar:
     Nx = st.number_input('バブル中心から画像左端の距離：Nx [pix]', value=427)
     #TODO 求めたい温度分布の縦の長さ[pixel] #1000
     Nz = st.number_input('バブル中心から水領域上端の距離；Nz [pix]', value=916)
+    n_apr_pix = st.number_input('位相分布を近似する範囲；n_apr_pix [pix]', value = 700)
     h0 = st.number_input('画像下端から基板領域下端までの距離；h0 [pix]', value=129) #*画像下端から基板上面までの距離[pix]
     l = st.number_input('端のカット；l [pix]', value=20) #*L[pixel]：phseの画像を端から数えてl(エル)ピクセル目からNxピクセル目までを温度分布にして出力
     #TODO [pix]:近似を行う場合は範囲を指定(<=1024)
-    n = Nz #!ここを揃えないと「近似計算後の」温度分布のグラフが描画されない（エラーが出る）
     #TODO [z1:z2,x1:x2]の範囲の位相を平均し，その位相を0にoffset，絶対水温の領域を指定．zは縦方向，xは横方向．順番に注意．
     st.markdown("""### [z1&#58;z2,x1&#58;x2]の位相を0にする""")
     z1 = st.number_input('z1[pix]', value=720)
@@ -41,6 +41,9 @@ with st.sidebar:
     st.markdown("""## 1. 高さ一定の位相""")
     k_extract_microm_phase = st.number_input('温度，流速を抽出する基板からの高さ；k_extract_microm_phase [μm]', value=100) #*関数近似を行う位置の基板からの距離[μm]
     convolve_size_temp = st.number_input('convolve_size_temp；convolve_size_temp', value=40) #*移動平均サイズ
+
+    gaussian_additive_term = st.radio("一次関数か定数か：",("linear", "constant"))
+
     title_phase = st.checkbox('title_phase')
     experiment_plot_phase = st.checkbox('experiment')
     experiment_plot_offset_phase = st.checkbox('experiment_offset')
@@ -128,11 +131,14 @@ with tab01:
                 d_micro_to_pix_temp=d_micro_to_pix_temp,
                 k_extract_microm_phase=k_extract_microm_phase,
                 convolve_size_temp=convolve_size_temp,
+                Nx  = int(Nx),
+                Nz  = int(Nz),
+                n_apr_pix = int(n_apr_pix),
                 z1=z1,
                 z2=z2,
                 x1=x1,
                 x2=x2,
-                n = Nx
+                gaussian_additive_term = gaussian_additive_term
             )
 
         except Exception as e:
@@ -141,7 +147,7 @@ with tab01:
     else:
         st.warning("phase.csvファイルをアップロードしてください。")
 
-    tab10, tab11 = st.tabs(["図", "csv"])
+    tab10, tab11, tab12 = st.tabs(["図", "csv", "parameter"])
     #* 位相分布の図
     with tab10:
         if fname_phase is not None:
@@ -151,23 +157,33 @@ with tab01:
             st.pyplot(phaseanalyzer.fig_offset_convolve)
             fig = plt.figure()
             plt.plot(phaseanalyzer.img_phase_array_offset_convolve[0], color ='blue')
-            plt.plot(phaseanalyzer.img_phase_array_offset_convolve[800], color ='red')
+            plt.plot(phaseanalyzer.img_phase_array_offset_convolve[300], color ='red')
+            plt.plot(phaseanalyzer.img_phase_array_offset_convolve[500], color ='green')
             st.pyplot(fig)
-            st.markdown("""### offset_convolve_apr""")
             if hasattr(phaseanalyzer, 'error_msg') and phaseanalyzer.error_msg:
                 st.write("関数近似にエラーが発生:", phaseanalyzer.error_msg)
             else:
-                fig = phaseanalyzer.fig_offset_convolve_apr
-                # たとえば matplotlib で表示するなら
-                # import matplotlib.pyplot as plt
-                # plt.figure(fig.number).
-                # plt.show()
+                st.markdown("""### offset_convolve_gaussian_plus_linear""")
+                fig = phaseanalyzer.fig_offset_convolve_gaussian_plus_linear
+                ax = fig.axes[0]
+                ax.axhline(y=n_apr_pix, color='white', linewidth=1)
                 st.pyplot(fig)
-                df = pd.DataFrame(phaseanalyzer.phase_full[0])
-                st.dataframe(df)
-                # st.write(phaseanalyzer.fig_offset_convolve_apr)
-                df = pd.DataFrame(phaseanalyzer.popt_full) # shape = (4, 1024))
-                st.dataframe(df)
+
+                st.markdown("""### offset_convolve_gaussian""")
+                fig = phaseanalyzer.fig_offset_convolve_gaussian
+                ax = fig.axes[0]
+                ax.axhline(y=n_apr_pix, color='white', linewidth=1)
+                st.pyplot(fig)
+
+                st.markdown("""### offset_convolve_gaussian_centered""")
+                fig = phaseanalyzer.fig_offset_convolve_gaussian_centered
+                ax = fig.axes[0]
+                ax.axhline(y=n_apr_pix, color='white', linewidth=1)
+                st.pyplot(fig)
+
+            fig = plt.figure()
+            plt.plot(phaseanalyzer.x_axis, phaseanalyzer.phase_full[0][500], color ='blue')
+            st.pyplot(fig)
 
     #* 位相分布のcsv
     with tab11:
@@ -176,13 +192,78 @@ with tab01:
             st.dataframe(pd.DataFrame(phaseanalyzer.img_phase_array_offset))
             st.markdown("""### offset_convolve""")
             st.dataframe(pd.DataFrame(phaseanalyzer.img_phase_array_offset_convolve))
-            st.markdown("""### offset_convolve_apr""")
+            st.markdown("""### offset_convolve_gaussian_plus_linear""")
             st.dataframe(pd.DataFrame(phaseanalyzer.phase_full[0]))
+            st.markdown("""### offset_convolve_gaussian""")
+            st.dataframe(pd.DataFrame(phaseanalyzer.phase_full[1]))
+            st.markdown("""### offset_convolve_gaussian_centered""")
+            st.dataframe(pd.DataFrame(phaseanalyzer.phase_full[2]))
+            st.markdown("""### offset_convolve_negative_gaussian_centered""")
+            st.dataframe(pd.DataFrame(phaseanalyzer.phase_full[3]))
 
+    #* 位相分布のパラメータ
+    with tab12:
+        if fname_phase is not None:
+            st.markdown("""### A_init""")
+            fig = plt.figure()
+            plt.plot(phaseanalyzer.popt_init_full[:,0], label = 'A_init', color ='blue')
+            plt.plot(phaseanalyzer.popt_full[:,0], label = 'A', color ='red')
+            plt.legend()
+            st.pyplot(fig)
 
+            st.markdown("""### mu""")
+            fig = plt.figure()
+            plt.plot(phaseanalyzer.popt_init_full[:,1], label = 'mu_init', color ='blue')
+            plt.plot(phaseanalyzer.popt_full[:,1], label = 'mu', color ='red')
+            plt.legend()
+            st.pyplot(fig)
 
+            st.markdown("""### sigma""")
+            fig = plt.figure()
+            plt.plot(phaseanalyzer.popt_init_full[:,2], label = 'sigma_init', color ='blue')
+            plt.plot(phaseanalyzer.popt_full[:,2], label = 'sigma', color ='red')
+            plt.legend()
+            st.pyplot(fig)
+            if  gaussian_additive_term == "linear":
+                st.markdown("""### m""")
+                fig = plt.figure()
+                plt.plot(phaseanalyzer.popt_init_full[:,3], label = 'm_init', color ='blue')
+                plt.plot(phaseanalyzer.popt_full[:,3], label = 'm', color ='red')
+                plt.legend()
+                st.pyplot(fig)
 
+                st.markdown("""### b""")
+                fig = plt.figure()
+                plt.plot(phaseanalyzer.popt_init_full[:,4], label = 'b_init', color ='blue')
+                plt.plot(phaseanalyzer.popt_full[:,4], label = 'b', color ='red')
+                plt.legend()
+                st.pyplot(fig)
 
+                st.markdown("""### popt_init""")
+                df = pd.DataFrame(phaseanalyzer.popt_init_full,
+                                columns=['A_init', 'mu_init', 'sigma_init', 'm_init', 'b_init']) # shape = (4, 1024))
+                st.dataframe(df)
+                st.markdown("""### popt""")
+                df = pd.DataFrame(phaseanalyzer.popt_full,
+                                columns = ['A', 'mu', 'sigma', 'm', 'b'])
+                st.dataframe(df)
+
+            elif gaussian_additive_term == "constant":
+                st.markdown("""### b""")
+                fig = plt.figure()
+                plt.plot(phaseanalyzer.popt_init_full[:,3], label = 'b_init', color ='blue')
+                plt.plot(phaseanalyzer.popt_full[:,3], label = 'b', color ='red')
+                plt.legend()
+                st.pyplot(fig)
+
+                st.markdown("""### popt_init""")
+                df = pd.DataFrame(phaseanalyzer.popt_init_full,
+                                columns=['A_init', 'mu_init', 'sigma_init', 'b_init']) # shape = (4, 1024))
+                st.dataframe(df)
+                st.markdown("""### popt""")
+                df = pd.DataFrame(phaseanalyzer.popt_full,
+                                columns = ['A', 'mu', 'sigma', 'b'])
+                st.dataframe(df)
 
 #! 流速分布のタブ
 with tab03:

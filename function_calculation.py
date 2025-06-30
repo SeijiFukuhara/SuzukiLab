@@ -10,6 +10,7 @@ import string
 import sys
 import cv2
 from scipy.optimize import curve_fit
+import traceback
 
 def loadtext(fname):
     fname_load = np.loadtxt(fname, delimiter = ",")
@@ -265,80 +266,143 @@ def plot_phase(np_array,d_temp):
 #     y3 = -popt[0]*np.exp(-popt[2]*x**2)
 #     return y3
 
-def y0(x, A, mu, sigma, m, b):
+def  gaussian_plus_linear(x, A, mu, sigma, m, b):
     return A * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2)) + m * x + b
 
-def y1(x, A, mu, sigma):
+def  gaussian_plus_offset(x, A, mu, sigma, b):
+    return A * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2)) + b
+
+def  gaussian(x, A, mu, sigma):
     return A * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
 
-def y2(x, A, sigma):
+def  gaussian_centered(x, A, sigma):
     return A * np.exp(-(x ** 2) / (2 * sigma ** 2))
 
-def y3(x, A, sigma):
+def negative_gaussian_centered(x, A, sigma):
     return -A * np.exp(-(x ** 2) / (2 * sigma ** 2))
 
-def approximation_phase(twolist_array,n,width_phase,height_phase):
-    popt_full = np.array([]).reshape(0, 5)  # (0, 5) の空配列
-    width_phase_half = width_phase//2 # width_phaseが奇数の場合はエラー出ると思う
-    array_x = np.tile(np.array(list(range(-width_phase_half,width_phase_half))), (n,1))
-    '''
-    width_phase_half = 4、n = 3のとき
-    array_x = [[-4 -3 -2 -1  0  1  2  3]
-    [-4 -3 -2 -1  0  1  2  3]
-    [-4 -3 -2 -1  0  1  2  3]]
-    <class 'numpy.ndarray'>
-    '''
+def estimate_initial_gaussian_params(x, y):
+    # A_init = np.max(y)
+    A_init = np.max(y) - np.min(y)
 
-    def func_original(x, A, mu, sigma, m, b):
-        #TODO 有効数字の桁数を変えることで結果が大きく変わる
-        return A * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2)) + m * x + b
+    threshold = 0.5 * np.max(y)
+    mask = y > threshold
+    if np.any(mask):
+        mu_init = np.sum(x[mask] * y[mask]) / np.sum(y[mask])
 
-    def estimate_initial_gaussian_params(x, y):
-        A_init = np.max(y)
-        mu_init = np.sum(x * y) / np.sum(y)
-        sigma_init = np.sqrt(np.sum(y * (x - mu_init)**2) / np.sum(y))
-        sigma_init = max(sigma_init, 1e-6)  # 0や小さすぎる値を防ぐ
-        return A_init, mu_init, sigma_init
+    half_max = np.max(y) / 2
+    indices = np.where(y >= half_max)[0]
+    if len(indices) >= 2:
+        fwhm = x[indices[-1]] - x[indices[0]]
+        sigma_init = fwhm / 2.355
+    else:
+        sigma_init = (np.max(x) - np.min(x)) / 4  # fallback
+    sigma_init = max(sigma_init, 1e-6)
 
-    popt_full_list = []
-    for i in range(n):
-        array_y = np.array(twolist_array[i])
-        #* 初期パラメータの推定
-        A_init, mu_init, sigma_init = estimate_initial_gaussian_params(array_x[0], array_y)
-        popt, _ = curve_fit(func_original, array_x[0], array_y, maxfev=20000, p0=[A_init, mu_init, sigma_init, 0.001, 0.0001])
-        popt_full_list.append(popt)  # popt をリストに追加
+    m_init = 0.0001  # 初期値
 
-    popt_full = np.array(popt_full_list) # <class 'list'> -> <class 'nd.array'>
-    p0, p1, p2, p3, p4 = np.split(popt_full, 5, axis=1)
-    popt_columns = [p0, p1, p2, p3, p4]
-    '''
-    popt_full_list = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]] のとき、
-    popt_columns = [array([[ 1],[ 4],[ 7],[10]]), array([[ 2],[ 5],[ 8],[11]]), array([[ 3],[ 6],[ 9],[12]])]
-    popt_full_listの要素を各列ごとにまとめている
-    '''
-    phase_full = np.zeros((4, n, width_phase))  # 4つのフェーズデータをまとめて作成
-    # phase_full = np.zeros((4, width_phase, height_phase))  # 4つのフェーズデータをまとめて作成
+    b_init = 0.15  # 初期値
+    return A_init, mu_init, sigma_init, m_init, b_init
 
-    # y0, y1, y2, y3 をリストに格納
-    y_functions = [y0, y1, y2, y3]
+def approximation_phase(twolist_array, x_axis, width_phase,height_phase,n_apr_pix, gaussian_additive_term):
+    # popt_full = np.array([]).reshape(0, 5)  # (0, 5) の空配列
 
-    # 各フェーズデータを計算し、対応する配列に格納
-    for i, y_func in enumerate(y_functions):
-        for j in range(n):
-            A, mu, sigma, m, b = popt_full[j]
-            if y_func == y0:
-                y_values = y0(array_x[j], A, mu, sigma, m, b)
-            elif y_func == y1:
-                y_values = y1(array_x[j], A, mu, sigma)
-            elif y_func == y2:
-                y_values = y2(array_x[j], A, sigma)
-            elif y_func == y3:
-                y_values = y3(array_x[j], A, sigma)
-            phase_full[i, j, :] = y_values  # 横方向に格納
-            # phase_partial = y_func(array_x, popt_columns)
-            # phase_full[i, :n, :] = phase_partial
+    if gaussian_additive_term == "linear":
+        n_params = 5
+        func = gaussian_plus_linear
+        popt_full = np.zeros((n_apr_pix, n_params))
+        popt_init_full = np.zeros((n_apr_pix, n_params))
+        # y0, y1, y2, y3 をリストに格納
+        y_functions = [
+                        gaussian_plus_linear,
+                        gaussian,
+                        gaussian_centered,
+                        negative_gaussian_centered
+                        ]
 
-    return phase_full, popt_full
+        num_functions = len(y_functions)
+        phase_apr = np.zeros((num_functions, n_apr_pix, width_phase))  # 4つのフェーズデータをまとめて作成
+
+        for i in range(n_apr_pix):
+            array_y = np.array(twolist_array[i])
+            #* 初期パラメータの推定
+            A_init, mu_init, sigma_init, m_init, b_init = estimate_initial_gaussian_params(x_axis, array_y)
+            #* フィッティング（ガウシアン+ 一次関数）
+            popt, _ = curve_fit(func, x_axis, array_y, maxfev=20000,
+                                p0=[A_init, mu_init, sigma_init, m_init, b_init],
+                                bounds=([A_init - 0.5, mu_init - 20, sigma_init - 15, m_init - 0.1, b_init - 1],
+                                        [A_init + 0.5, mu_init + 20, sigma_init + 15, m_init + 0.1, b_init + 1])
+                                )
+            popt_init_full[i] = [A_init, mu_init, sigma_init, m_init, b_init]
+            popt_full[i] = popt  # フィッティング結果を格納
+
+        # 各フェーズデータを計算し、対応する配列に格納
+        for i, y_func in enumerate(y_functions):
+            for j in range(n_apr_pix):
+                A, mu, sigma, m, b = popt_full[j]
+                if y_func == gaussian_plus_linear:
+                    y_values = gaussian_plus_linear(x_axis, A, mu, sigma, m, b)
+                elif y_func == gaussian:
+                    y_values = gaussian(x_axis, A, mu, sigma)
+                elif y_func == gaussian_centered:
+                    y_values = gaussian_centered(x_axis, A, sigma)
+                elif y_func == negative_gaussian_centered:
+                    y_values = negative_gaussian_centered(x_axis, A, sigma)
+                phase_apr[i, j, :] = y_values  # 横方向に格納
+
+    elif gaussian_additive_term == "constant":
+        n_params = 4
+        func = gaussian_plus_offset
+        popt_full = np.zeros((n_apr_pix, n_params))
+        popt_init_full = np.zeros((n_apr_pix, n_params))
+        # y0, y1, y2, y3 をリストに格納
+        y_functions = [
+                        gaussian_plus_offset,
+                        gaussian,
+                        gaussian_centered,
+                        negative_gaussian_centered
+                        ]
+
+        num_functions = len(y_functions)
+        phase_apr = np.zeros((num_functions, n_apr_pix, width_phase))  # 4つのフェーズデータをまとめて作成
+
+        for i in range(n_apr_pix):
+            array_y = np.array(twolist_array[i])
+            #* 初期パラメータの推定
+            A_init, mu_init, sigma_init, _, b_init = estimate_initial_gaussian_params(x_axis, array_y)
+            #* フィッティング（ガウシアン+ 定数）
+            popt, _ = curve_fit(func, x_axis, array_y, maxfev=20000,
+                                p0=[A_init, mu_init, sigma_init, b_init],
+                                bounds=([A_init - 0.5, mu_init - 20, sigma_init - 15, b_init - 1],
+                                        [A_init + 0.5, mu_init + 20, sigma_init + 15, b_init + 1])
+                                )
+            popt_init_full[i] = [A_init, mu_init, sigma_init, b_init]
+            popt_full[i] = popt  # フィッティング結果を格納
+
+        # 各フェーズデータを計算し、対応する配列に格納
+        for i, y_func in enumerate(y_functions):
+            phase_list = []
+            for j in range(n_apr_pix):
+                A, mu, sigma, b = popt_full[j]
+                if y_func == gaussian_plus_offset:
+                    y_values = gaussian_plus_offset(x_axis, A, mu, sigma, b)
+                elif y_func == gaussian:
+                    y_values = gaussian(x_axis, A, mu, sigma)
+                elif y_func == gaussian_centered:
+                    y_values = gaussian_centered(x_axis, A, sigma)
+                elif y_func == negative_gaussian_centered:
+                    y_values = negative_gaussian_centered(x_axis, A, sigma)
+                phase_apr[i, j, :] = y_values  # 横方向に格納
+    else:
+        raise ValueError("gaussian_additive_term must be 'linear' or 'constant'")
+
+    twolist_expanded = twolist_array[np.newaxis, :, :]
+    phase_full = np.tile(twolist_expanded, (num_functions, 1, 1))
+    for i in range(num_functions):
+        phase_full[i][:phase_apr[i].shape[0], :] = phase_apr[i]
+
+    return phase_full, popt_full, popt_init_full
+
 
 
 
