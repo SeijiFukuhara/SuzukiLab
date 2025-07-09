@@ -34,12 +34,23 @@ class FlowAnalyzer:
         self.x0_new = self.x0_grid + self.adjust_x_grid  # 原点の位置を微調整
         self.x_axis_grid = np.arange(self.width_grid) - self.x0_new  # x座標配列を生成
 
-        #* 流速計算
+        #* microm_or_pixの選択
         #? pixを直接指定するか、μmを指定するか選択
-        if microm_or_pix == "k_extract_microm_flow[μm]":
-            self.k_extract_pix_flow = int(self.k_extract_microm_flow * self.d_micro_to_pix_flow) + self.y0_grid
+        if microm_or_pix == "k_extract_microm[μm]":
+            self.k_extract_pix_flow_from_substrate =  int(self.k_extract_microm * self.d_micro_to_pix_flow)
+            self.k_extract_pix_flow_from_bottom = self.k_extract_pix_flow_from_substrate + self.y0_grid
+            self.k_extract_microm_flow_from_substrate = self.k_extract_microm
+            self.k_extract_microm_flow_from_bottom =round(self.k_extract_pix_flow_from_bottom / self.d_micro_to_pix_flow, 2)
         elif microm_or_pix == "debug_k_pix[pix]":
-            self.k_extract_pix_flow = debug_k_pix
+            self.k_extract_pix_flow_from_bottom = debug_k_pix
+            self.k_extract_pix_flow_from_substrate = self.k_extract_pix_flow_from_bottom - self.h0
+            self.k_extract_microm_flow_from_bottom =  round(self.k_extract_pix_flow_from_bottom / self.d_micro_to_pix_flow,2)
+            self.k_extract_microm_flow_from_substrate = round(self.k_extract_pix_flow_from_substrate / self.d_micro_to_pix_flow,2)
+        self.k_extract_pix_flow_from_top = self.height_gird - self.k_extract_pix_flow_from_bottom
+
+
+
+
         #? x方向とy方向の流速を、FE座標で取得
         self.flow_vx = self.flow_xy(4)
         self.flow_vy = self.flow_xy(5)

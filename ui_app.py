@@ -3,13 +3,13 @@ import numpy as np
 import pandas as pd
 import io
 import matplotlib.pyplot as plt
+import pickle
+from matplotlib.patches import Rectangle
 #? クラスのインポート
 from class_phase import PhaseAnalyzer
 from class_temp import TempAnalyzer
 from class_flow import FlowAnalyzer
 from class_heatflux import HeatFluxAnalyzer
-
-st.title("熱流束")
 
 with st.sidebar:
     #!ファイル入力
@@ -34,7 +34,22 @@ with st.sidebar:
     st.markdown('''# :orange[温度分布]''')
     st.markdown("""## 設定""")
     #TODO 求めたい温度分布の横の長さ，バブル中心から画像横端までの長さ[pix]，0列目からNx列目までを軸対象と仮定する # 1024
-    Nx = st.number_input('バブル中心から画像左端の距離：Nx [pix]', step=1, format="%d", value = 510)
+
+    # 初期化: セッションステートに 'Nx' がない場合のみ初期値512をセット
+    if 'Nx' not in st.session_state:
+        st.session_state.Nx = 512
+
+    # number_input で session_state の値を使用
+    Nx = st.number_input(
+        'バブル中心から画像左端の距離：Nx [pix]',
+        step=1,
+        format="%d",
+        value=st.session_state.Nx,  # セッションステートの値を表示
+        key='Nx'  # セッションステートの 'Nx' に紐づける
+    )
+
+
+    # Nx = st.number_input('バブル中心から画像左端の距離：Nx [pix]', step=1, format="%d", value = 512)
     #TODO 求めたい温度分布の縦の長さ[pixel] #1024
     Nz = st.number_input('温度を計算する範囲；Nz [pix]', step=1, format="%d", value = 1024, max_value=1024)
     n_apr_pix = st.number_input('位相分布を近似する範囲；n_apr_pix [pix]', step=1, format="%d", value = 700)
@@ -119,6 +134,49 @@ if fname_phase is not None:
     temp_phase_path = "temp_uploaded.csv"
     with open(temp_phase_path, "wb") as f:
         f.write(fname_phase.read())
+
+    phaseanalyzer = PhaseAnalyzer(
+        csv_file=temp_phase_path,
+        d_micro_to_pix_temp=d_micro_to_pix_temp,
+        k_extract_microm=k_extract_microm,
+        convolve_size_temp=convolve_size_temp,
+        Nx  = int(Nx),
+        l = int(l),
+        h0  = int(h0),
+        n_apr_pix = int(n_apr_pix),
+        z1=z1,
+        z2=z2,
+        x1=x1,
+        x2=x2,
+        gaussian_additive_term = gaussian_additive_term,
+        debug_k_pix=debug_k_pix,
+        microm_or_pix=radio_microm_or_pix
+    )
+
+    tempanalyzer = TempAnalyzer(
+        phase_dict=phaseanalyzer.phase_full_array_dict,
+        x_axis = phaseanalyzer.x_axis_pix,
+        d_micro_to_pix_temp=d_micro_to_pix_temp,
+        k_extract_microm_phase=k_extract_microm_phase,
+        convolve_size_temp=convolve_size_temp,
+        Nx=int(Nx),
+        Nz=int(Nz),
+        l=int(l),
+        n_apr_pix=int(n_apr_pix),
+        lamda=lamda,
+        T_room=T_room,
+    )
+
+    heatfluxanalyzer = HeatFluxAnalyzer(
+        tempanalyzer.T_dict,
+        tempanalyzer.x_axis_pix_half,
+        phaseanalyzer.k_extract_pix_phase_from_top,
+        T_room,
+        0.05,
+        int(n_apr_pix),
+        T_room
+        )
+
 else:
     st.warning("phase.csvファイルをアップロードしてください。")
 
@@ -127,29 +185,11 @@ tab01, tab02, tab03, tab04 = st.tabs(["1.位相分布","2.温度分布", "3.流�
 
 #! 位相分布のタブ
 with tab01:
-    if fname_phase is not None:
-        # クラスのインスタンスを作成
-        phaseanalyzer = PhaseAnalyzer(
-            csv_file=temp_phase_path,
-            d_micro_to_pix_temp=d_micro_to_pix_temp,
-            k_extract_microm=k_extract_microm,
-            convolve_size_temp=convolve_size_temp,
-            Nx  = int(Nx),
-            h0  = int(h0),
-            n_apr_pix = int(n_apr_pix),
-            z1=z1,
-            z2=z2,
-            x1=x1,
-            x2=x2,
-            gaussian_additive_term = gaussian_additive_term,
-            debug_k_pix=debug_k_pix,
-            microm_or_pix=radio_microm_or_pix
-        )
-
     tab10, tab11, tab12, tab13 = st.tabs(["図","高さ一定の位相", "csv", "parameter"])
     #* 位相分布の図
     with tab10:
         if fname_phase is not None:
+            st.markdown(f"""## 近似関数：{gaussian_additive_term}""")
             for key, array in phaseanalyzer.phase_full_fig_dict.items():
                 st.markdown(f"""### {key}""")
                 fig = array
@@ -157,6 +197,17 @@ with tab01:
                 ax.axhline(y=phaseanalyzer.k_extract_pix_phase_from_top, color='white', linewidth=1)
                 ax.axhline(y=phaseanalyzer.height_phase - h0 -1, color='black', linewidth=1)
                 ax.axhline(y=phaseanalyzer.n_apr_pix, color='brown', linewidth=1)
+                rect = Rectangle(
+                    (x1, z1),             # 左上が(0,0)の座標系で (x1,z1) が左下
+                    x2 - x1,              # 幅
+                    z2 - z1,              # 高さ
+                    linewidth=1,
+                    edgecolor='r',
+                    facecolor="#0e0d0d",
+                    alpha=0.3
+                )
+                ax.add_patch(rect)
+
                 st.pyplot(fig)
     #* 位相分布の高さ一定グラフ
     with tab11:
@@ -165,10 +216,19 @@ with tab01:
             st.markdown(f"""### 画面下端から{phaseanalyzer.k_extract_microm_phase_from_bottom}[μm]""")
             st.markdown(f"""### 基板表面から{phaseanalyzer.k_extract_pix_phase_from_substrate}[pix]""")
             st.markdown(f"""### 基板表面から{phaseanalyzer.k_extract_microm_phase_from_substrate}[μm]""")
+            st.markdown(f"""### 画面上端から{np.round(phaseanalyzer.popt_dict['mu'][phaseanalyzer.k_extract_pix_phase_from_top]).astype(int)}[pix]だけ左にずらした""")
             fig, ax = plt.subplots()
             for key, array in phaseanalyzer.phase_full_array_dict.items():
                 column = array[phaseanalyzer.k_extract_pix_phase_from_top]
-                plt.plot(phaseanalyzer.x_axis, column, label=key)
+                plt.plot(phaseanalyzer.x_axis_pix, column, label=key)
+            # 凡例をグラフの外（右）に配置
+            ax.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
+            st.pyplot(fig)
+            st.markdown(f"""### 温度分布取得に使う範囲のみ""")
+            fig, ax = plt.subplots()
+            for key, array in phaseanalyzer.phase_full_array_slice_dict.items():
+                column = array[phaseanalyzer.k_extract_pix_phase_from_top]
+                plt.plot(phaseanalyzer.x_axis_pix_slice, column, label=key)
                 plt.legend()# キーをラベルに
             st.pyplot(fig)
 
@@ -201,53 +261,84 @@ with tab01:
 #! 温度分布のタブ
 with tab02:
     tab20, tab21, tab22 = st.tabs(["図", "csv", "高さ一定の温度"])
-    if fname_phase is not None:
-        try:
-            # クラスのインスタンスを作成
-            tempanalyzer = TempAnalyzer(
-                phase_dict=phaseanalyzer.phase_full_array_dict,
-                d_micro_to_pix_temp=d_micro_to_pix_temp,
-                k_extract_microm_phase=k_extract_microm_phase,
-                convolve_size_temp=convolve_size_temp,
-                Nx=int(Nx),
-                Nz=int(Nz),
-                l=int(l),
-                n_apr_pix=int(n_apr_pix),
-                lamda=lamda,
-                T_room=T_room,
-            )
-            if hasattr(tempanalyzer, 'error_msg') and tempanalyzer.error_msg:
-                st.write("関数近似にエラーが発生:", tempanalyzer.error_msg)
-        except Exception as e:
-            st.error(f"エラーが発生しました: {e}")
+
+    with open("T_dict.pkl", "wb") as f:
+        pickle.dump(tempanalyzer.T_dict, f)
+    with open("x_axis_pix_half.pkl", "wb") as f:
+        pickle.dump(tempanalyzer.x_axis_pix_half, f)
 
     #* 温度分布の図
     with tab20:
         if fname_phase is not None:
             # 呼び出し側
-            fig, ax = tempanalyzer.T_fig_dict['offset']
-            ax.axhline(y=phaseanalyzer.k_extract_pix_phase_from_top, color='white', linewidth=1)
-            ax.axhline(y=phaseanalyzer.height_phase - h0 -1, color='black', linewidth=1)
+            for key, fig_T in tempanalyzer.T_fig_dict.items():
+                st.write(f"### {key}")
+                fig, ax = fig_T
+                ax.axhline(y=phaseanalyzer.k_extract_pix_phase_from_top, color='white', linewidth=1)
+                ax.axhline(y=phaseanalyzer.height_phase - h0 -1, color='black', linewidth=1)
+                st.pyplot(fig)
 
-            # # rの位置に縦線を描画
-            # for pos in tempanalyzer.r_dict['offset']:
-            #     ax.axvline(x=pos, color='white', linestyle='--', linewidth=0.2)
-            st.pyplot(fig)
     #* 温度分布のcsv
     with tab21:
         if fname_phase is not None:
             for key, array in tempanalyzer.T_dict.items():
                 st.markdown(f"""### {key}""")
                 st.dataframe(pd.DataFrame(array))
+            st.markdown("""### cutoff前の温度分布""")
+            for key, array in tempanalyzer.T_dict.items():
+                with st.expander(f"{key} cutoff前"):
+                    st.write(array)
+            st.divider()
+            st.markdown("""### cutoff後の温度分布""")
+            for key, array in heatfluxanalyzer.temp_full_array_cutoff_dict.items():
+                with st.expander(f"{key} cutoff後"):
+                    st.write(array)
     #* 高さ一定の温度
     with tab22:
         if fname_phase is not None:
+            st.markdown("""### 高さ一定温度グラフ""")
+            st.markdown(f"""### 高さ一定の位相""")
+            st.markdown(f"""### 画面下端から{phaseanalyzer.k_extract_pix_phase_from_bottom}[pix]""")
+            st.markdown(f"""### 画面下端から{phaseanalyzer.k_extract_microm_phase_from_bottom}[μm]""")
+            st.markdown(f"""### 基板表面から{phaseanalyzer.k_extract_pix_phase_from_substrate}[pix]""")
+            st.markdown(f"""### 基板表面から{phaseanalyzer.k_extract_microm_phase_from_substrate}[μm]""")
+            st.markdown(f"""### cutoff前の温度分布""")
             fig = plt.figure()
             for key, array in tempanalyzer.T_dict.items():
                 plt.plot(array[phaseanalyzer.k_extract_pix_phase_from_top], label = {key})
             plt.axhline(y=T_room, color='k', linestyle='--',label = 'T = 24.5')  # T=24.5の水平線を引く
             plt.legend()
             st.pyplot(fig)
+            st.markdown(f"""### cutoff後の温度分布""")
+            fig = plt.figure()
+            for key, array in heatfluxanalyzer.temp_full_array_cutoff_dict.items():
+                plt.plot(array[phaseanalyzer.k_extract_pix_phase_from_top], label = {key})
+            plt.axhline(y=T_room, color='k', linestyle='--',label = 'T = 24.5')  # T=24.5の水平線を引く
+            plt.legend()
+            st.pyplot(fig)
+            fig = plt.figure()
+
+            common_keys = set(heatfluxanalyzer.x_axis_pix_cutoff_dict.keys()) & set(heatfluxanalyzer.temp_full_array_cutoff_dict.keys()) & set(heatfluxanalyzer.temp_full_array_cutoff_apr_dict.keys())
+            a = phaseanalyzer.k_extract_pix_phase_from_top
+            # 各キーに対して処理
+            for key in common_keys:
+                array1 = heatfluxanalyzer.x_axis_pix_cutoff_dict[key][a]  # 横軸
+                array2 = heatfluxanalyzer.temp_full_array_cutoff_dict[key][a]  # 縦軸1
+                array3 = heatfluxanalyzer.temp_full_array_cutoff_apr_dict[key][a]  # 縦軸2
+                st.markdown(f"""### {key}""")
+                # プロット
+                fig, ax = plt.subplots()
+                ax.plot(array1, array2, label=f"{key} cutoff")
+                ax.plot(array1, array3, label=f"{key} cutoff apr")
+                ax.axhline(y=T_room, color='k', linestyle='--',label = 'T = 24.5')
+                ax.set_xlabel('dict1[{}][{}]'.format(key, a))
+                ax.set_ylabel('Values')
+                ax.set_title('Key: {}'.format(key))
+                ax.legend()
+                st.pyplot(fig)
+                plt.close(fig)  # メモリ解放
+
+
 
 #! 流速分布のタブ
 with tab03:
@@ -277,7 +368,7 @@ with tab03:
 
     if fname_flow is not None:
         if radio_microm_or_pix == "k_extract_microm[μm]":
-            a = str(flowanalyzer.k_extract_microm) +" μm"
+            a = str(flowanalyzer.k_extract_microm_flow) +" μm"
         elif radio_microm_or_pix == "debug_k_pix[pix]":
             a = str(flowanalyzer.k_extract_pix_flow) + " pix"
 
@@ -414,28 +505,5 @@ with tab03:
 
 #! 熱流束のタブ
 with tab04:
-    # if fname_phase is not None and fname_flow is not None:
-    if fname_phase is not None:
-        heatfluxanalyzer = HeatFluxAnalyzer(
-            tempanalyzer.T_dict,
-            phaseanalyzer.k_extract_pix_phase_from_top,
-            T_room,
-            0.05)
-        st.markdown("""### 高さ一定温度グラフ""")
-        fig = plt.figure()
-        for key, array in tempanalyzer.T_dict.items():
-            plt.plot(array[phaseanalyzer.k_extract_pix_phase_from_top], label = {key})
-        plt.axhline(y=T_room, color='k', linestyle='--',label = 'T = 24.5')  # T=24.5の水平線を引く
-        plt.legend()
-        st.pyplot(fig)
-        fig = plt.figure()
+    tab40, tab41, tab42, tab43 = st.tabs(["図","data", "csv", "parameter"])
 
-        for key, array in heatfluxanalyzer.temp_full_array_cutoff_dict.items():
-            fig = plt.figure()
-            plt.plot(array, label = {key})
-            plt.axhline(y=T_room, color='k', linestyle='--',label = 'T = 24.5')  # T=24.5の水平線を引く
-            plt.legend()
-            st.pyplot(fig)
-
-    else:
-        st.warning("phase.csvとflow.csvの両方をアップロードしてください。")
