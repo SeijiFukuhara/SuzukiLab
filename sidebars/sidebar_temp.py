@@ -23,6 +23,8 @@ def render_sidebar_temp():
         data_temp_apr_k_extract = st.checkbox('data_temp_apr_k_extract')
         st.divider()
         thredhold_cutoff = st.number_input('thredhold_cutoff',value=0.1,step=0.01,format="%.2f")
+        uniform_filter_size = st.number_input('uniform_filter_size', value=10, step=1, format="%d", help="scipyのuniform_filter1dで高さに対して移動平均を取る際のサイズ")
+        min_points_required = st.number_input('min_points_required', value=10, step=1, format="%d", help="cutoffの結果この値以下の点しか得られなかった高さについては、近似を行わない。")
 
     return (
         meshmode_offset_convolve,
@@ -34,5 +36,7 @@ def render_sidebar_temp():
         thredhold_cutoff,
         # show_fig_temp_dict,
         show_guide_dict,
-        show_title_temp_extract
+        show_title_temp_extract,
+        uniform_filter_size,
+        min_points_required
     )

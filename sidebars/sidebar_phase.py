@@ -54,6 +54,7 @@ def render_sidebar_phase():
         l = st.number_input('端のカット；l [pix]', value=20) #*l[pixel]：phseの画像を端から数えてl(エル)ピクセル目からNxピクセル目までを温度分布にして出力
         #TODO [pix]:近似を行う場合は範囲を指定(<=1024)
         #TODO [z1:z2,x1:x2]の範囲の位相を平均し，その位相を0にoffset，絶対水温の領域を指定．zは縦方向，xは横方向．順番に注意．
+        x_adjust = st.number_input('右を正として中心をずらす量；x_adjust [pix]', step=1, format="%d", value = 0, max_value=1024, help="offset_convolve_centeredのみで有効。0ならばoffset_convolveに対して行った近似関数の頂点の位置にずれる。さらにずらしたい量をここに入力。")
         st.markdown("""### [z1&#58;z2,x1&#58;x2]の位相を0にする""")
         z1 = st.number_input('z1[pix]', value=720)
         z2 = st.number_input('z2[pix]', value=730)
@@ -65,13 +66,13 @@ def render_sidebar_phase():
 
         show_phase_temp_dict = {
             'original': st.checkbox('original', key='fig_original'),
-            'offset': st.checkbox('offset', key='fig_offset'),
-            'offset_convolve': st.checkbox('offset_convolve', key='fig_offset_convolve'),
-            'offset_convolve_centered': st.checkbox('offset_convolve_centered', key='fig_offset_convolve_centered'),
-            'gaussian_plus_linear':st.checkbox('gaussian_plus_linear', key='fig_gaussian_plus_linear'),
-            'gaussian_plus_linear_centered': st.checkbox('gaussian_plus_linear_centered', key='fig_gaussian_plus_linear_centered'),
-            'gaussian_plus_offset': st.checkbox('gaussian_plus_offset', key='fig_gaussian_plus_offset'),
-            'gaussian_plus_offset_centered': st.checkbox('gaussian_plus_offset_centered', key='fig_gaussian_plus_offset_centered'),
+            'offset': st.checkbox('offset', key='fig_offset', value=True),
+            'offset_convolve': st.checkbox('offset_convolve', key='fig_offset_convolve', value=True),
+            'offset_convolve_centered': st.checkbox('offset_convolve_centered', key='fig_offset_convolve_centered', value=True),
+            'gaussian_plus_linear':st.checkbox('gaussian_plus_linear', key='fig_gaussian_plus_linear', value=True),
+            'gaussian_plus_linear_centered': st.checkbox('gaussian_plus_linear_centered', key='fig_gaussian_plus_linear_centered', value=True),
+            'gaussian_plus_offset': st.checkbox('gaussian_plus_offset', key='fig_gaussian_plus_offset', value=True),
+            'gaussian_plus_offset_centered': st.checkbox('gaussian_plus_offset_centered', key='fig_gaussian_plus_offset_centered', value=True),
         }
         st.markdown("""## :green[位相分布の図]""")
         st.markdown("""### 補助線など""")
@@ -94,6 +95,7 @@ def render_sidebar_phase():
         n_apr_pix,
         h0,
         l,
+        x_adjust,
         #* offsetの範囲
         z1,
         z2,

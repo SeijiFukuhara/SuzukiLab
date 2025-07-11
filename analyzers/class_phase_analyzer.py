@@ -8,7 +8,7 @@ from function_calculation import offset, plot_phase,approximation_phase, shift_2
 
 import streamlit as st
 @st.cache_data
-def make_phase_dict(img_phase_array, convolve_size_temp, z1, z2, x1, x2, x_axis_pix, width_phase, height_phase, n_apr_pix, gaussian_additive_term, d_micro_to_pix_temp):
+def make_phase_dict(img_phase_array, convolve_size_temp, z1, z2, x1, x2, x_axis_pix, width_phase, height_phase, n_apr_pix, gaussian_additive_term, d_micro_to_pix_temp, x_adjust):
     #* original
     phase_original_dict = {"original": img_phase_array}
     #* offset
@@ -27,7 +27,7 @@ def make_phase_dict(img_phase_array, convolve_size_temp, z1, z2, x1, x2, x_axis_
         gaussian_additive_term = gaussian_additive_term,
         )
     #* offset and convolve centered
-    img_phase_array_offset_convolve_shift = shift_2d_array(img_phase_array_offset_convolve, np.round(popt_dict['mu']).astype(int), fill_value=0)
+    img_phase_array_offset_convolve_shift = shift_2d_array(img_phase_array_offset_convolve, np.round(popt_dict['mu']).astype(int), x_adjust, fill_value=0)
     phase_offset_convolve_centered_dict = {"offset_convolve_centered": img_phase_array_offset_convolve_shift}
     #* integrate dict
     # phase_full_array_dict = phase_original_dict | phase_offset_dict | phase_offset_convolve_dict | phase_offset_convolve_centered_dict | phase_apr_dict
@@ -38,7 +38,7 @@ def make_phase_dict(img_phase_array, convolve_size_temp, z1, z2, x1, x2, x_axis_
 
 class PhaseAnalyzer:
     #!__init__() 内で self.なしで変数を定義することは可能だが、原則として推奨されない。
-    def __init__(self, csv_file, d_micro_to_pix_temp, k_extract_microm, convolve_size_temp,Nx, l, h0,  n_apr_pix, z1, z2, x1, x2, gaussian_additive_term, debug_k_pix, microm_or_pix):
+    def __init__(self, csv_file, d_micro_to_pix_temp, k_extract_microm, convolve_size_temp,Nx, l, h0,  n_apr_pix, z1, z2, x1, x2, gaussian_additive_term, debug_k_pix, microm_or_pix, x_adjust):
         self.path = csv_file
         self.d_micro_to_pix_temp = d_micro_to_pix_temp
         self.k_extract_microm = k_extract_microm
@@ -53,6 +53,7 @@ class PhaseAnalyzer:
         self.x2 = x2
         self.gaussian_additive_term = gaussian_additive_term
         self.debug_k_pix = debug_k_pix
+        self.x_adjust = x_adjust
 
 
         #* csvファイル読み込み
@@ -79,6 +80,7 @@ class PhaseAnalyzer:
             n_apr_pix = self.n_apr_pix,
             gaussian_additive_term = self.gaussian_additive_term,
             d_micro_to_pix_temp = self.d_micro_to_pix_temp,
+            x_adjust = self.x_adjust
         )
 
         #* 位相分布のうち、温度分布計算に使う範囲のみにスライス

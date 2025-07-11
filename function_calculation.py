@@ -238,13 +238,14 @@ def load_video_with_leading_image(image_path, video_path):
 #! 位相分布
 import numpy as np
 
-def shift_array(array, a, fill_value=0):
+def shift_array(array, a, x_adjust, fill_value=0):
     """
     array: 1D numpy array
     a: int, シフト量（正で左シフト、負で右シフト）
     fill_value: シフトで空いた部分に入れる値
     """
     shifted = np.full_like(array, fill_value)
+    a = a + x_adjust  # x_adjustをシフト量に加える
 
     if a > 0:
         # 左にシフト
@@ -257,7 +258,7 @@ def shift_array(array, a, fill_value=0):
 
     return shifted
 
-def shift_2d_array(array_2d, shift_list, fill_value=0):
+def shift_2d_array(array_2d, shift_list, x_adjust, fill_value=0):
     """
     array_2d: 2D numpy array
     shift_list: 各行に対するシフト量（長さはarray_2dの行数以下）
@@ -270,7 +271,7 @@ def shift_2d_array(array_2d, shift_list, fill_value=0):
         raise ValueError(f"shift_list の長さ ({len(shift_list)}) が array_2d の行数 ({num_rows}) を超えています。")
 
     for i in range(len(shift_list)):
-        shifted_array_2d[i] = shift_array(array_2d[i], shift_list[i], fill_value)
+        shifted_array_2d[i] = shift_array(array_2d[i], shift_list[i], x_adjust, fill_value)
 
     # shift_list が短い場合、残りの行はそのままコピー
     for i in range(len(shift_list), num_rows):
@@ -585,36 +586,64 @@ def plot_temp(np_array, d_temp):
 
     return fig
 
-
-###############################################################################################################
-#! 熱流束
-def cut_array_by_threshold(array, target, threshold, from_end=False):
+def cut_array_by_threshold(array, target, threshold, from_end):
     if from_end:
         indices = range(len(array)-1, -1, -1)  # 末尾→先頭
     else:
-        indices = range(len(array))  # 先頭→末尾
+        indices = range(len(array)) # 先頭→末尾
 
     for i in indices:
         diff = array[i] - target
         if diff < threshold:
-            # i番目でカット
             if from_end:
-                return array[i+1:]
+                array[i+1:] = np.nan
             else:
-                return array[:i]
+                array[:i] = np.nan
+            break
 
-    # 条件を満たさない場合
     return array
 
-def cut_2d_array_by_threshold(array_2d, target, threshold, from_end=False):
+def cut_2d_array_by_threshold(array_2d, target, threshold, h0, from_end):
     """
-    二次元配列(array_2d)の各行（一次元配列）にcut_array_by_thresholdを適用し、
-    結果を二次元配列として返す。
+    各行にcut_array_by_thresholdを適用後、
+    さらに後ろからh0個をNaN埋めする二次元配列を返す。
     """
-    result = []
-    for row in array_2d:
+    #* 温度分布の基板部分をNan埋め
+    array_2d[-h0:, :] = np.nan
+    #* 水部分の各行に対してcutofffを実行
+    for index, row in enumerate(array_2d[:-h0]):
         cut_row = cut_array_by_threshold(row, target, threshold, from_end)
-        result.append(cut_row)
+        array_2d[index] = cut_row
+        # cut_row = np.array(cut_row, dtype=float)  # NaN埋めのためfloat型に変換
+        cut_row[-h0:] = np.nan if h0 <= len(cut_row) else np.nan
+
+    return array_2d
+
+import numpy as np
+
+def nan_below_threshold_2d(array_2d, a):
+    """
+    各行の先頭から走査し、値が a を下回ったら、
+    その要素以降を NaN に置き換える。
+
+    Parameters
+    ----------
+    array_2d : ndarray
+        二次元配列 (float型推奨)
+    a : float
+        閾値
+
+    Returns
+    -------
+    result : ndarray
+        処理後の二次元配列
+    """
+    result = array_2d.copy()
+    for i, row in enumerate(result):
+        for j, val in enumerate(row):
+            if val < a:
+                row[j:] = np.nan
+                break
     return result
 
 def estimate_initial_gaussian_params_cutoff_temp(x, y):
@@ -642,6 +671,79 @@ def estimate_initial_gaussian_params_cutoff_temp(x, y):
         sigma_init = np.sqrt(np.sum(y_adj * (x - mu_weighted) ** 2) / np.sum(y_adj))
     return A_init, sigma_init
 
+def approximation_cutoff_temp(twolist_array, x_axis_pix_half, n_apr_pix, T_room, min_points_required):
+    n_params = 2
+    func_estimate = estimate_initial_gaussian_params_cutoff_temp
+    func_approx = gaussian_centered
+    popt_full = np.zeros((n_apr_pix, n_params))
+    popt_init_full = np.zeros((n_apr_pix, n_params))
+
+    popt_names = ["A","sigma"]
+    popt_init_names = ["A_init", "sigma_init"]
+
+    temp_apr = np.empty(n_apr_pix, dtype=object)
+    skipped_indices = []  # スキップしたindexを保存するリスト
+
+
+
+
+    for i in range(n_apr_pix):
+        x_axis_pix_half_copy = x_axis_pix_half.copy()
+        array_y = twolist_array[i]
+        not_nan_mask = ~np.isnan(array_y)
+        x_axis = x_axis_pix_half_copy[not_nan_mask]  # 横方向のピクセル
+        array_y_nonan_offset = array_y[not_nan_mask] - T_room  # NaNを除去してからT_roomを引く
+
+        #* データ点数が少ない場合 NaN埋めしてスキップ
+        if np.sum(not_nan_mask) <= min_points_required:
+            # print(f"Skipping index {i} due to insufficient data points")
+            temp_apr[i] = np.full_like(array_y, np.nan)  # 元配列と同じ長さでNaN埋め
+            popt_init_full[i] = [np.nan, np.nan]
+            popt_full[i] = [np.nan, np.nan]
+            skipped_indices.append(i)  # スキップしたindexをリストに追加
+            continue
+
+        # 数値部分を判定するマスク
+        #* 初期パラメータの推定
+        A_init, sigma_init = func_estimate(x_axis, array_y_nonan_offset)
+        # print("i:", i)
+        # print("len(x_axis):", len(x_axis))
+        # print("len(array_y_nonan_offset):", len(array_y_nonan_offset))
+        # print("x_axis:", x_axis)
+        # print("array_y_nonan_offset:", array_y_nonan_offset)
+
+        #* フィッティング（ガウシアン）
+        popt, _ = curve_fit(func_approx, x_axis, array_y_nonan_offset, maxfev=20000,
+                            p0=[A_init, sigma_init],
+                            # bounds=([0, -np.inf, 0], [np.inf, np.inf, np.inf])
+                            )
+        # popt_init_full[i] = [A_init, mu_init, sigma_init]
+        # popt_full[i] = popt  # フィッティング結果を格納
+        # print("A_init:", A_init, "sigma_init:", sigma_init)
+        # print("A:", popt[0], "sigma:", popt[1])
+        popt_init_full[i] = [A_init, sigma_init]
+        popt_full[i] = popt  # フィッティング結果を格納
+
+        # 各フェーズデータを計算し、対応する配列に格納
+        A, sigma = popt_full[i]
+        y_values = func_approx(x_axis, A, sigma) + T_room
+
+        #* 元の array_y の長さに合わせて末尾を NaN 埋め
+        y_values_padded = np.full_like(array_y, np.nan)
+        y_values_padded[not_nan_mask] = y_values
+
+        temp_apr[i] = y_values_padded  # 横方向に格納
+
+
+    popt_dict = dict(zip(popt_names, popt_full.T))
+    popt_init_dict = dict(zip(popt_init_names, popt_init_full.T))
+    skipped_indices = np.array(skipped_indices)  # スキップしたindexをNumPy配列に変換
+
+    return temp_apr, popt_dict, popt_init_dict, skipped_indices
+
+
+###############################################################################################################
+#! 熱流束
 def estimate_initial_gaussian_params_cutoff_flow(x, y):
     """
     x: 1D array, x data
@@ -670,155 +772,3 @@ def estimate_initial_gaussian_params_cutoff_flow(x, y):
         sigma_init = np.sqrt(np.sum(y_adj * (x - mu_weighted) ** 2) / np.sum(y_adj))
 
     return A_init, mu_init, sigma_init, b_init
-
-def approximation_cutoff(twolist_array, twolist_x_axis, n_apr_pix, T_room,  mode):
-    if mode == "temp":
-        n_params = 2
-        func_estimate = estimate_initial_gaussian_params_cutoff_temp
-        func_approx = gaussian_centered
-        popt_full = np.zeros((n_apr_pix, n_params))
-        popt_init_full = np.zeros((n_apr_pix, n_params))
-
-        popt_names = ["A","sigma"]
-        popt_init_names = ["A_init", "sigma_init"]
-
-        temp_apr = np.empty(n_apr_pix, dtype=object)
-
-        for i in range(n_apr_pix):
-            width_temp = len(twolist_array[i])  # 横方向のピクセル
-            temp_apr[i] = np.zeros(width_temp)
-            x_axis = twolist_x_axis[i]  # 横方向のピクセル
-            array_y = np.array(twolist_array[i]) - T_room
-            #* 初期パラメータの推定
-            A_init, sigma_init = func_estimate(x_axis, array_y)
-            # print("x_axis.shape:", x_axis.shape, "array_y.shape:", array_y.shape)
-            
-            #* フィッティング（ガウシアン）
-            popt, _ = curve_fit(func_approx, x_axis, array_y, maxfev=20000,
-                                p0=[A_init, sigma_init],
-                                # bounds=([0, -np.inf, 0], [np.inf, np.inf, np.inf])
-                                )
-            # popt_init_full[i] = [A_init, mu_init, sigma_init]
-            # popt_full[i] = popt  # フィッティング結果を格納
-            # print("A_init:", A_init, "sigma_init:", sigma_init)
-            # print("A:", popt[0], "sigma:", popt[1])
-            popt_init_full[i] = [A_init, sigma_init]
-            popt_full[i] = popt  # フィッティング結果を格納
-
-        # 各フェーズデータを計算し、対応する配列に格納
-            A, sigma = popt_full[i]
-            y_values = func_approx(x_axis, A, sigma) + T_room
-            temp_apr[i] = y_values  # 横方向に格納
-
-        # popt_init_full[:, 3] = popt_init_full[:, 3] * (10**(-4))  # m_initを10^(-4)倍
-        # popt_full[:, 3] = popt_full[:, 3] * (10**(-4))  # m_initを10^(-4)倍
-
-        # twolist_expanded = twolist_array[np.newaxis, :, :]
-        # phase_full = np.tile(twolist_expanded, (num_functions, 1, 1))
-        # for i in range(num_functions):
-        #     phase_full[i][:phase_apr[i].shape[0], :] = phase_apr[i]
-
-    elif mode == "flow":
-        n_params = 4
-        # func = gaussian_plus_offset
-        # popt_full = np.zeros((n_apr_pix, n_params))
-        # popt_init_full = np.zeros((n_apr_pix, n_params))
-        # # y0, y1, y2, y3 をリストに格納
-        # y_functions = [
-        #                 gaussian_plus_offset,
-        #                 # gaussian,
-        #                 # gaussian_centered,
-        #                 # negative_gaussian_centered
-        #                 ]
-
-        # popt_names = ["A", "mu", "sigma", "b"]
-        # popt_init_names = ["A_init", "mu_init", "sigma_init", "b_init"]
-
-        # num_functions = len(y_functions)
-        # phase_apr = np.zeros((num_functions, n_apr_pix, width_phase))  # 4つのフェーズデータをまとめて作成
-
-        # for i in range(n_apr_pix):
-        #     array_y = np.array(twolist_array[i])
-        #     #* 初期パラメータの推定
-        #     A_init, mu_init, sigma_init, _, b_init = estimate_initial_gaussian_params(x_axis, array_y)
-        #     #* フィッティング（ガウシアン+ 定数）
-        #     popt, _ = curve_fit(func, x_axis, array_y, maxfev=20000,
-        #                         p0=[A_init, mu_init, sigma_init, b_init],
-        #                         bounds=([A_init - 0.5, mu_init - 20, sigma_init - 15, b_init - 1],
-        #                                 [A_init + 0.5, mu_init + 20, sigma_init + 15, b_init + 1])
-        #                         )
-        #     popt_init_full[i] = [A_init, mu_init, sigma_init, b_init]
-        #     popt_full[i] = popt  # フィッティング結果を格納
-
-        # # 各フェーズデータを計算し、対応する配列に格納
-        # for i, y_func in enumerate(y_functions):
-        #     phase_list = []
-        #     for j in range(n_apr_pix):
-        #         A, mu, sigma, b = popt_full[j]
-        #         if y_func == gaussian_plus_offset:
-        #             y_values = gaussian_plus_offset(x_axis, A, mu, sigma, b)
-        #         elif y_func == gaussian:
-        #             y_values = gaussian(x_axis, A, mu, sigma)
-        #         elif y_func == gaussian_centered:
-        #             y_values = gaussian_centered(x_axis, A, sigma)
-        #         elif y_func == negative_gaussian_centered:
-        #             y_values = negative_gaussian_centered(x_axis, A, sigma, b)
-        #         phase_apr[i, j, :] = y_values  # 横方向に格納
-
-        # twolist_expanded = twolist_array[np.newaxis, :, :]
-        # phase_full = np.tile(twolist_expanded, (num_functions, 1, 1))
-        # for i in range(num_functions):
-        #     phase_full[i][:phase_apr[i].shape[0], :] = phase_apr[i]
-
-    else:
-
-        raise ValueError("gaussian_additive_term must be 'linear' or 'constant'")
-
-    # phase_apr_dict = dict(zip(y_functions, phase_full))
-    # phase_apr_dict = {func.__name__: value for func, value in zip(y_functions, phase_full)}
-    popt_dict = dict(zip(popt_names, popt_full.T))
-    popt_init_dict = dict(zip(popt_init_names, popt_init_full.T))
-
-    return temp_apr, popt_dict, popt_init_dict
-
-def approximation_cutoff_temp(twolist_array, twolist_x_axis, n_apr_pix, T_room):
-    n_params = 2
-    func_estimate = estimate_initial_gaussian_params_cutoff_temp
-    func_approx = gaussian_centered
-    popt_full = np.zeros((n_apr_pix, n_params))
-    popt_init_full = np.zeros((n_apr_pix, n_params))
-
-    popt_names = ["A","sigma"]
-    popt_init_names = ["A_init", "sigma_init"]
-
-    temp_apr = np.empty(n_apr_pix, dtype=object)
-
-    for i in range(n_apr_pix):
-        width_temp = len(twolist_array[i])  # 横方向のピクセル
-        temp_apr[i] = np.zeros(width_temp)
-        x_axis = twolist_x_axis[i]  # 横方向のピクセル
-        array_y = np.array(twolist_array[i]) - T_room
-        #* 初期パラメータの推定
-        A_init, sigma_init = func_estimate(x_axis, array_y)
-        # print("x_axis.shape:", x_axis.shape, "array_y.shape:", array_y.shape)
-
-        #* フィッティング（ガウシアン）
-        popt, _ = curve_fit(func_approx, x_axis, array_y, maxfev=20000,
-                            p0=[A_init, sigma_init],
-                            # bounds=([0, -np.inf, 0], [np.inf, np.inf, np.inf])
-                            )
-        # popt_init_full[i] = [A_init, mu_init, sigma_init]
-        # popt_full[i] = popt  # フィッティング結果を格納
-        # print("A_init:", A_init, "sigma_init:", sigma_init)
-        # print("A:", popt[0], "sigma:", popt[1])
-        popt_init_full[i] = [A_init, sigma_init]
-        popt_full[i] = popt  # フィッティング結果を格納
-
-    # 各フェーズデータを計算し、対応する配列に格納
-        A, sigma = popt_full[i]
-        y_values = func_approx(x_axis, A, sigma) + T_room
-        temp_apr[i] = y_values  # 横方向に格納
-    popt_dict = dict(zip(popt_names, popt_full.T))
-    popt_init_dict = dict(zip(popt_init_names, popt_init_full.T))
-
-    return temp_apr, popt_dict, popt_init_dict

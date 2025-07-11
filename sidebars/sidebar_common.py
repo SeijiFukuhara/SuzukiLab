@@ -1,4 +1,6 @@
 import streamlit as st
+import os
+import glob
 
 def render_sidebar_common():
     with st.sidebar:
@@ -11,6 +13,25 @@ def render_sidebar_common():
         st.markdown("## flow.csvファイルを入力")
         fname_flow= st.file_uploader("Choose a flow.csv file",accept_multiple_files= False, type = ['csv'])
 
+        # 削除対象のディレクトリ
+        target_folder = "cache_folder"
+
+        # Streamlitボタン
+        if st.button("キャッシュ(.pkl)ファイルを削除"):
+            # 指定フォルダ内のpklファイルパスを取得
+            pkl_files = glob.glob(os.path.join(target, "*.pkl"))
+
+            # ファイル削除処理
+            for file_path in pkl_files:
+                try:
+                    os.remove(file_path)
+                    st.write(f"削除しました: {file_path}")
+                except Exception as e:
+                    st.write(f"削除失敗: {file_path}, エラー: {e}")
+
+            if not pkl_files:
+                st.write("削除対象の.pklファイルはありませんでした。")
+
         st.divider()
         st.markdown('''# :orange[抜き出す高さ]''')
         #*関数近似を行う位置の基板からの距離[μm]
@@ -20,6 +41,8 @@ def render_sidebar_common():
         radio_microm_or_pix = st.radio("μmかpixか：",("k_extract_microm[μm]", "debug_k_pix[pix]"))
 
         st.divider()
+
+
 
 
         #!共通

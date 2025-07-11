@@ -38,8 +38,15 @@ def render_tab_temp(tempanalyzer, phaseanalyzer, T_room, h0, show_phase_temp_dic
 
             i += 1
 
+        # st.write(tempanalyzer.temp_full_array_dict['offset_convolve_centered'])
+        # fig = plt.figure()
+        # plt.plot(tempanalyzer.temp_full_array_dict['offset_convolve_centered'][300])
+        # st.pyplot(fig)
 
-
+        # st.write(tempanalyzer.temp_full_array_uniform_dict['offset_convolve_centered'])
+        # fig = plt.figure()
+        # plt.plot(tempanalyzer.temp_full_array_uniform_dict['offset_convolve_centered'][300])
+        # st.pyplot(fig)
 
         # # 呼び出し側
         # for key, fig_T in tempanalyzer.temp_full_fig_dict.items():
@@ -51,6 +58,31 @@ def render_tab_temp(tempanalyzer, phaseanalyzer, T_room, h0, show_phase_temp_dic
 
     #* 温度分布の高さ一定グラフ
     with tab21:
+        x = tempanalyzer.x_axis_pix_half
+        k = phaseanalyzer.k_extract_pix_phase_from_top
+        del show_phase_temp_dict['original']  # 'original'は除外
+
+        # keys_to_remove = ['original', 'offset']
+        show_phase_temp_new_dict = {k: v for k, v in show_phase_temp_dict.items() if '_centered' in k}
+
+        for key in [k for k, v in show_phase_temp_new_dict.items() if v]:
+            ax = fig.axes[0]
+
+            fig = plt.figure()
+            plt.title(f"{key}")
+            plt.plot(x, tempanalyzer.temp_full_array_uniform_dict[key][k], label='uniform')
+            plt.plot(x, tempanalyzer.temp_full_array_uniform_cutoff_dict[key][k], label='uniform_cutoff')
+            plt.plot(x, tempanalyzer.temp_full_array_uniform_cutoff_apr_dict[key][k], label='uniform_cutoff_apr')
+            plt.axhline(y=T_room, color='black', linestyle='--', label='T_room')
+            plt.legend()
+            plt.show()
+
+            st.pyplot(fig)
+
+
+
+
+
         st.markdown("""### 高さ一定温度グラフ""")
         shift_pixel = -np.round(phaseanalyzer.popt_dict['mu'][phaseanalyzer.k_extract_pix_phase_from_top]).astype(int)
         shift_microm = round(shift_pixel / phaseanalyzer.d_micro_to_pix_temp, 2)
@@ -62,11 +94,12 @@ def render_tab_temp(tempanalyzer, phaseanalyzer, T_room, h0, show_phase_temp_dic
         df = pd.DataFrame(data)
         st.dataframe(df)
 
+
         st.markdown("""### 全体グラフ""")
         fig, ax = plt.subplots()
         if show_title_temp_extract:
             plt.title(f'from substrate {phaseanalyzer.k_extract_microm_phase_from_substrate} [μm]')
-        for key, array in tempanalyzer.temp_full_arrey_dict.items():
+        for key, array in tempanalyzer.temp_full_array_dict.items():
             if key in show_phase_temp_dict and not show_phase_temp_dict[key]:
                 continue
             column = array[phaseanalyzer.k_extract_pix_phase_from_top]
@@ -83,7 +116,9 @@ def render_tab_temp(tempanalyzer, phaseanalyzer, T_room, h0, show_phase_temp_dic
             if key in show_phase_temp_dict and not show_phase_temp_dict[key]:
                 continue
             column = array[phaseanalyzer.k_extract_pix_phase_from_top]
-            ax.plot(tempanalyzer.x_axis_pix_cutoff_dict[key][phaseanalyzer.k_extract_pix_phase_from_top],column, label=key)
+            ax.plot(tempanalyzer.x_axis_pix_half, column, label=key)
+            # ax.plot(tempanalyzer.x_axis_pix_cutoff_dict[key][phaseanalyzer.k_extract_pix_phase_from_top],column, label=key)
+            # ax.plot(tempanalyzer.x_axis, column, label=key)
         plt.axhline(y=T_room, color='k', linestyle='--',label = 'T = 24.5')  # T=24.5の水平線を引く
         plt.legend()
         st.pyplot(fig)
@@ -111,11 +146,11 @@ def render_tab_temp(tempanalyzer, phaseanalyzer, T_room, h0, show_phase_temp_dic
         
     #* 温度分布のcsv
     with tab22:
-        for key, array in tempanalyzer.temp_full_arrey_dict.items():
+        for key, array in tempanalyzer.temp_full_array_dict.items():
             st.markdown(f"""### {key}""")
             st.dataframe(pd.DataFrame(array))
         st.markdown("""### cutoff前の温度分布""")
-        for key, array in tempanalyzer.temp_full_arrey_dict.items():
+        for key, array in tempanalyzer.temp_full_array_dict.items():
             with st.expander(f"{key} cutoff前"):
                 st.write(array)
         st.divider()

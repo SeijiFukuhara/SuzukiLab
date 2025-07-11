@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import traceback
 
 #? 関数ファイルから必要な関数をインポート
-from function_calculation import cut_2d_array_by_threshold, approximation_cutoff
+from function_calculation import cut_2d_array_by_threshold, approximation_cutoff_temp
 
 def malke_temp_apr_dict(temp_full_array_cutoff_dict, x_axis_pix_cutoff_dict, n_apr_pix, T_room):
     # 結果を保存する辞書を初期化

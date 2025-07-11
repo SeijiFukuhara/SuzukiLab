@@ -1,17 +1,22 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib
+import pickle
+import os
+#* sidebarのインポート
 from sidebars import sidebar_common, sidebar_temp, sidebar_phase,sidebar_flow
 from tabs import tab_phase
 from tabs import tab_temp
-# from analyzers_create import (create_phase_analyzer,
-#                             create_temp_analyzer,
-#                             create_flow_analyzer,
-#                             create_heatflux_analyzer)
+#* analyzerのインポート
 from analyzers.class_phase_analyzer import PhaseAnalyzer
 from analyzers.class_temp_analyzer import TempAnalyzer
 from analyzers.class_flow_analyzer import FlowAnalyzer
 from analyzers.class_heatflux_analyzer import HeatFluxAnalyzer
+
+#* グラフのラベルに日本語を書けるようにするフォント設定
+matplotlib.rcParams['font.family'] = 'MS Gothic'  # Windowsの場合
+
 
 #! サイドバー
 #* 共通のサイドバー
@@ -27,6 +32,10 @@ from analyzers.class_heatflux_analyzer import HeatFluxAnalyzer
     d_micro_to_pix_flow
     )= sidebar_common.render_sidebar_common()
 
+
+
+
+
 #* 位相サイドバー
 (
     #* 設定
@@ -35,6 +44,7 @@ from analyzers.class_heatflux_analyzer import HeatFluxAnalyzer
     n_apr_pix,
     h0,
     l,
+    x_adjust,
     #* offsetの範囲
     z1,
     z2,
@@ -61,7 +71,9 @@ from analyzers.class_heatflux_analyzer import HeatFluxAnalyzer
     thredhold_cutoff,
     # show_fig_temp_dict,
     show_guide_temp_dict,
-    show_title_temp_extract
+    show_title_temp_extract,
+    uniform_filter_size,
+    min_points_required
     )= sidebar_temp.render_sidebar_temp()
 
 #* 流速サイドバー
@@ -86,6 +98,97 @@ from analyzers.class_heatflux_analyzer import HeatFluxAnalyzer
 #     r_max_flow
 #     ) = sidebar_flow.render_sidebar_flow()
 
+
+# # 計算結果を保存するファイル名
+# pickle_filename = "cached_result_temp‘.pkl"
+# pickle_filename = "cached_result_flow‘.pkl"
+
+# # UI入力
+# param1 = st.slider("Parameter 1", 0, 10, 5)
+# param2 = st.slider("Parameter 2", 0, 10, 3)
+
+# # 計算条件のキー（ハッシュ代わり）
+# current_params = (param1, param2)
+
+# # 計算結果読み込み関数
+# def load_cached_result():
+#     if os.path.exists(pickle_filename):
+#         with open(pickle_filename, "rb") as f:
+#             cached_params, result = pickle.load(f)
+#         # パラメータが同じならキャッシュを使う
+#         if cached_params == current_params:
+#             return result
+#     return None
+
+# # 計算結果保存関数
+# def save_cached_result(params, result):
+#     with open(pickle_filename, "wb") as f:
+#         pickle.dump((params, result), f)
+
+# # キャッシュ読み込み
+# result = load_cached_result()
+
+# # キャッシュが無ければ計算
+# if result is None:
+#     st.write("計算を実行します...")
+#     # 重い計算処理（例）
+#     result = param1 ** 2 + param2 ** 3
+#     # 計算結果を保存
+#     save_cached_result(current_params, result)
+# else:
+#     st.write("キャッシュから読み込みました。")
+
+# # 結果表示
+# st.write("計算結果:", result)
+# import streamlit as st
+# import pickle
+# import os
+
+# # 計算結果を保存するファイル名
+# pickle_filename = "cached_result.pkl"
+
+# # UI入力
+# param1 = st.slider("Parameter 1", 0, 10, 5)
+# param2 = st.slider("Parameter 2", 0, 10, 3)
+
+# # 計算条件のキー（ハッシュ代わり）
+# current_params = (param1, param2)
+
+# # 計算結果読み込み関数
+# def load_cached_result():
+#     if os.path.exists(pickle_filename):
+#         with open(pickle_filename, "rb") as f:
+#             cached_params, result = pickle.load(f)
+#         # パラメータが同じならキャッシュを使う
+#         if cached_params == current_params:
+#             return result
+#     return None
+
+# # 計算結果保存関数
+# def save_cached_result(params, result):
+#     with open(pickle_filename, "wb") as f:
+#         pickle.dump((params, result), f)
+
+# # キャッシュ読み込み
+# result = load_cached_result()
+
+# # キャッシュが無ければ計算
+# if result is None:
+#     st.write("計算を実行します...")
+#     # 重い計算処理（例）
+#     result = param1 ** 2 + param2 ** 3
+#     # 計算結果を保存
+#     save_cached_result(current_params, result)
+# else:
+#     st.write("キャッシュから読み込みました。")
+
+# # 結果表示
+# st.write("計算結果:", result)
+
+
+
+
+
 #! 解析器のインスタンス生成
 if fname_phase is not None:
     temp_phase_path = "temp_uploaded.csv"
@@ -108,12 +211,13 @@ if fname_phase is not None:
         x2=x2,
         gaussian_additive_term='linear',
         debug_k_pix=debug_k_pix,
-        microm_or_pix=radio_microm_or_pix
+        microm_or_pix=radio_microm_or_pix,
+        x_adjust=x_adjust
     )
 
     # TempAnalyzer の生成
     tempanalyzer = TempAnalyzer(
-        phase_full_arrey_dict=phaseanalyzer.phase_full_array_dict,
+        phase_full_array_dict=phaseanalyzer.phase_full_array_dict,
         x_axis=phaseanalyzer.x_axis_pix,
         d_micro_to_pix_temp=d_micro_to_pix_temp,
         k_extract_pix_phase_from_top=phaseanalyzer.k_extract_pix_phase_from_top,
@@ -122,10 +226,13 @@ if fname_phase is not None:
         Nz=int(Nz),
         l=int(l),
         n_apr_pix=int(n_apr_pix),
+        h0=h0,
         lamda=lamda,
         T_room=T_room,
         target=T_room,
-        threshold_cutoff=thredhold_cutoff
+        threshold_cutoff=thredhold_cutoff,
+        uniform_filter_size=uniform_filter_size,
+        min_points_required=min_points_required
     )
 
 if fname_flow is not None:
@@ -144,17 +251,17 @@ if fname_flow is not None:
     #     microm_or_pix=radio_microm_or_pix
     # )
 
-if fname_phase is not None and fname_flow is not None:
-    # HeatFluxAnalyzer の生成
-    heatfluxanalyzer = HeatFluxAnalyzer(
-        tempanalyzer.T_dict,
-        tempanalyzer.x_axis_pix_half,
-        phaseanalyzer.k_extract_pix_phase_from_top,
-        T_room,
-        0.05,
-        int(n_apr_pix),
-        T_room
-    )
+# if fname_phase is not None and fname_flow is not None:
+#     # HeatFluxAnalyzer の生成
+#     heatfluxanalyzer = HeatFluxAnalyzer(
+#         tempanalyzer.T_dict,
+#         tempanalyzer.x_axis_pix_half,
+#         phaseanalyzer.k_extract_pix_phase_from_top,
+#         T_room,
+#         0.05,
+#         int(n_apr_pix),
+#         T_room
+#     )
 
 #! タブのレンダリング
 tab1, tab2, tab3, tab4 = st.tabs(["位相", "温度", "流速", "熱流束"])
@@ -185,74 +292,3 @@ with tab2:
                                 )
 
 
-    # st.write(tempanalyzer.temp_full_array_cutoff_apr_dict)
-    # st.write(tempanalyzer.x_axis_pix_cutoff_dict)
-    # st.write(tempanalyzer.x_axis_pix_cutoff_dict)
-    # for key, array_2d in tempanalyzer.temp_full_array_cutoff_dict.items():
-    #     st.write(f"### {key} の温度分布")
-    #     for i, row in enumerate(array_2d):
-    #         if len(row) == 0:
-    #             st.write(f"{i} 行目は空です。")
-
-    # for key, array_2d in tempanalyzer.temp_full_array_uniform_cutoff_dict.items():
-    #     st.write(f"### {key} の温度分布")
-    #     for i, row in enumerate(array_2d):
-    #         if len(row) == 0:
-    #             st.write(f"{i} 行目は空です。")
-
-    # 空行情報を格納するリスト
-    # empty_rows_info = []
-
-    # for key, array_2d in tempanalyzer.temp_full_array_cutoff_dict.items():
-    #     for i, row in enumerate(array_2d):
-    #         if len(row) == 0:
-    #             empty_rows_info.append({"key": key, "row_index": i})
-
-    # # DataFrame に変換
-    # df_empty_rows = pd.DataFrame(empty_rows_info)
-
-    # if not df_empty_rows.empty:
-    #     st.write("### 空行が存在するキーと行番号（グラフ表示）")
-        
-    #     # プロット
-    #     fig, ax = plt.subplots(figsize=(8, 4))
-        
-    #     # キーごとにプロット
-    #     for key in df_empty_rows['key'].unique():
-    #         subset = df_empty_rows[df_empty_rows['key'] == key]
-    #         ax.scatter([key]*len(subset), subset['row_index'], label=key, alpha=0.8)
-        
-    #     ax.set_xlabel("キー")
-    #     ax.set_ylabel("空行 index")
-    #     ax.set_title("各キーごとの空行分布")
-    #     # ax.legend()
-    #     plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
-    #     plt.xticks(rotation=45)
-    #     plt.tight_layout()
-        
-    #     st.pyplot(fig)
-        
-    # else:
-    #     st.write("空行は存在しません。")
-
-    # tempanalyzer.temp_full_array_cutoff_dict の内容をプロット
-    for key, array_2d in tempanalyzer.temp_full_array_cutoff_dict.items():
-        # 各行の長さを取得
-        row_lengths = [len(row) for row in array_2d]
-        
-        # プロット
-        fig, ax = plt.subplots()
-        # ax.plot(row_lengths, marker='o')
-        ax.scatter(range(len(row_lengths)), row_lengths, s=5)  # ← scatter に変更
-        ax.set_title(f"{key} の各行の要素数")
-        ax.set_xlabel("行番号 (index)")
-        ax.set_ylabel("要素数 (len(row))")
-        
-        st.pyplot(fig)
-
-
-# with tab3:
-#     tab_flow.render_tan_flow(None)  # FlowAnalyzer も同様にインスタンス生成して渡す
-
-# with tab4:
-#     tab_heatflux.render_heatflux_tab(heatfluxanalyzer)
