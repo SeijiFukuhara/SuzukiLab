@@ -18,10 +18,14 @@ z1 = 500
 z2 = 510
 x1 = 0
 x2 = 20
+offset_area_slice = (slice(z1, z2), slice(x1, x2)) #* [z1:z2,x1:x2]の範囲の位相を平均し，その位相を0にoffset，絶対水温の領域を指定．zは縦方向，xは横方向．順番に注意．
 
 csv_folder = sys.argv[1]
 start_frame, end_frame = extract_frame_range_suffix(csv_folder)
 prefix = find_available_filename_combination(csv_folder)
+
+#* 大文字と小文字を区別しないようにする
+convolve = sys.argv[2].lower() == 'true'  # コマンドライン引数から移動平均の有無を取得
 
 # 現在の日時を取得してフォーマット（例: "_20250611_1930"）
 timestamp = datetime.now().strftime("_%Y%m%d_%H%M")
@@ -34,21 +38,33 @@ output_bmp_folder = add_tilde_to_filename(output_bmp_folder, prefix)  #* ファ�
 # os.makedirs(output_png_folder, exist_ok=True)
 os.makedirs(output_bmp_folder, exist_ok=True)
 
-start_time_phase = time.time() # 変換の計測開始
-
-for fname in sorted(os.listdir(csv_folder)): #? 指定されたフォルダ内の.csvファイルを一つずつ読み取り
-    if fname.lower().endswith('.csv'):
-        csv_path = os.path.join(csv_folder, fname)
-        img_phase_array = loadtext(csv_path)
-        #* offset処理を行い、位相画像をarrayにする
-        img_phase_array_offset = offset(img_phase_array, convolve,convolve_size_temp,z1,z2,x1,x2)
-
-        # 保存先のパスを設定（入力CSV名と同じ名前で .bmp にする）
-        # output_path = fname_phase.replace('.csv', '.bmp')
-        #* 画像を保存する
-        plot_phase_and_save(img_phase_array_offset, d_temp,csv_path, output_bmp_folder)
+#* 時間計測開始
+start_time_phase = time.time()
 
 
+# .csvファイル一覧取得
+csv_files = sorted([f for f in os.listdir(csv_folder) if f.lower().endswith('.csv')])
+total_files = len(csv_files)
+
+# 各ファイルに対して処理
+for i, fname in enumerate(csv_files, start=1):
+    csv_path = os.path.join(csv_folder, fname)
+    img_phase_array = loadtext(csv_path)
+
+    # offset処理
+    img_phase_array_offset = offset(img_phase_array, convolve_size_temp, offset_area_slice, convolve=convolve)
+
+    # BMP画像として保存
+    plot_phase_and_save(img_phase_array_offset, d_temp, csv_path, output_bmp_folder)
+
+    # 上書きで進捗表示
+    percent = (i / total_files) * 100
+    print(f"\r{i}/{total_files} ({percent:.1f}%) 完了: {fname}", end="", flush=True)
+
+#* 改行を明示（最後に表示が次の行へ移動）
+print()
+
+#* 時間計測終了
 end_time_phase = time.time()  # 終了時刻
 elapsed_time_phase = end_time_phase - start_time_phase
 

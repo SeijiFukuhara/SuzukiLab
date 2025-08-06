@@ -19,7 +19,7 @@ def render_sidebar_common():
         # Streamlitボタン
         if st.button("キャッシュ(.pkl)ファイルを削除"):
             # 指定フォルダ内のpklファイルパスを取得
-            pkl_files = glob.glob(os.path.join(target, "*.pkl"))
+            pkl_files = glob.glob(os.path.join(target_folder, "*.pkl"))
 
             # ファイル削除処理
             for file_path in pkl_files:

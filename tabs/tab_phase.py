@@ -4,7 +4,7 @@ from matplotlib.patches import Rectangle
 import pandas as pd
 import numpy as np
 
-def render_tab_phase(phaseanalyzer, x1, z1, x2, z2, h0,show_phase_temp_dict, show_guide_phase_dict, show_title_phase_dict):
+def render_tab_phase(phaseanalyzer, offset_area_slice, h0,show_phase_temp_dict, show_guide_phase_dict, show_title_phase_dict):
     #! 位相分布のタブ
     tab10, tab11, tab12, tab13 = st.tabs(["位相分布の図", "高さ一定の位相", "位相分布のcsv", "位相分布のパラメータ"])
     #* 位相分布の図
@@ -32,6 +32,10 @@ def render_tab_phase(phaseanalyzer, x1, z1, x2, z2, h0,show_phase_temp_dict, sho
                 if show_guide_phase_dict['subtract_surface']:
                     ax.axhline(y=phaseanalyzer.height_phase - h0 - 1, color='black', linewidth=1)
                 if show_guide_phase_dict['phase_color_offset_region']:
+                    # offset_area_slice から z1,z2,x1,x2 を取り出す
+                    z_slice, x_slice = offset_area_slice
+                    z1, z2 = z_slice.start, z_slice.stop
+                    x1, x2 = x_slice.start, x_slice.stop
                     rect = Rectangle(
                         (x1, z1),
                         x2 - x1,

@@ -60,6 +60,8 @@ def render_sidebar_phase():
         z2 = st.number_input('z2[pix]', value=730)
         x1 = st.number_input('x1[pix]', value=0)
         x2 = st.number_input('x2[pix]', value=20)
+        #* [z1:z2,x1:x2]の範囲の位相を平均し，その位相を0にoffset，絶対水温の領域を指定．zは縦方向，xは横方向．順番に注意．
+        offset_area_slice = (slice(z1, z2), slice(x1, x2)) 
         st.markdown("""### 位相計算""")
         # gaussian_additive_term = st.radio("一次関数か定数か：",("linear", "constant"), index=0)
         convolve_size_temp = _number_input_with_session_state('移動平均サイズ：convolve_size_temp', key='convolve_size_temp', default_value=21)
@@ -97,10 +99,7 @@ def render_sidebar_phase():
         l,
         x_adjust,
         #* offsetの範囲
-        z1,
-        z2,
-        x1,
-        x2,
+        offset_area_slice,
         #* 位相近似の設定
         # gaussian_additive_term,
         convolve_size_temp,

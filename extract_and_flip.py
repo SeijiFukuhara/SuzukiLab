@@ -1,6 +1,7 @@
 import cv2
 import os
 import argparse
+from PIL import Image
 
 def extract_frame_range(video_path, start_frame, end_frame, flip=False):
     cap = cv2.VideoCapture(video_path)
@@ -37,8 +38,12 @@ def extract_frame_range(video_path, start_frame, end_frame, flip=False):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         out_name = f"{name}_frame_{start_frame}.bmp"
         save_path = os.path.join(dir_name, out_name)
-        cv2.imwrite(save_path, gray)
-        print(f"保存完了: {save_path} （1フレームをグレースケールで保存）")
+        #* 日本語のファイル名を扱うためにPILを使用
+        try:
+            Image.fromarray(gray).save(save_path)
+            print(f"保存成功: {save_path}")
+        except Exception as e:
+            print(f"保存失敗: {save_path} → エラー内容: {e}")
     else:
         out_name = f"{name}_frames_{start_frame}_{end_frame}.avi"
         save_path = os.path.join(dir_name, out_name)

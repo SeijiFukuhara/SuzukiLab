@@ -32,10 +32,6 @@ matplotlib.rcParams['font.family'] = 'MS Gothic'  # Windowsの場合
     d_micro_to_pix_flow
     )= sidebar_common.render_sidebar_common()
 
-
-
-
-
 #* 位相サイドバー
 (
     #* 設定
@@ -46,10 +42,7 @@ matplotlib.rcParams['font.family'] = 'MS Gothic'  # Windowsの場合
     l,
     x_adjust,
     #* offsetの範囲
-    z1,
-    z2,
-    x1,
-    x2,
+    offset_area_slice,
     #* 位相近似の設定
     # gaussian_additive_term,
     convolve_size_temp,
@@ -186,9 +179,6 @@ matplotlib.rcParams['font.family'] = 'MS Gothic'  # Windowsの場合
 # st.write("計算結果:", result)
 
 
-
-
-
 #! 解析器のインスタンス生成
 if fname_phase is not None:
     temp_phase_path = "temp_uploaded.csv"
@@ -199,41 +189,37 @@ if fname_phase is not None:
     phaseanalyzer = PhaseAnalyzer(
         csv_file=temp_phase_path,
         d_micro_to_pix_temp=d_micro_to_pix_temp,
-        k_extract_microm=k_extract_microm,
         convolve_size_temp=convolve_size_temp,
         Nx=int(Nx),
         l=int(l),
         h0=int(h0),
         n_apr_pix=int(n_apr_pix),
-        z1=z1,
-        z2=z2,
-        x1=x1,
-        x2=x2,
+        offset_area_slice=offset_area_slice,
         gaussian_additive_term='linear',
         debug_k_pix=debug_k_pix,
         microm_or_pix=radio_microm_or_pix,
         x_adjust=x_adjust
     )
 
-    # TempAnalyzer の生成
-    tempanalyzer = TempAnalyzer(
-        phase_full_array_dict=phaseanalyzer.phase_full_array_dict,
-        x_axis=phaseanalyzer.x_axis_pix,
-        d_micro_to_pix_temp=d_micro_to_pix_temp,
-        k_extract_pix_phase_from_top=phaseanalyzer.k_extract_pix_phase_from_top,
-        convolve_size_temp=convolve_size_temp,
-        Nx=int(Nx),
-        Nz=int(Nz),
-        l=int(l),
-        n_apr_pix=int(n_apr_pix),
-        h0=h0,
-        lamda=lamda,
-        T_room=T_room,
-        target=T_room,
-        threshold_cutoff=thredhold_cutoff,
-        uniform_filter_size=uniform_filter_size,
-        min_points_required=min_points_required
-    )
+    # # TempAnalyzer の生成
+    # tempanalyzer = TempAnalyzer(
+    #     phase_full_array_dict=phaseanalyzer.phase_full_array_dict,
+    #     x_axis=phaseanalyzer.x_axis_pix_phase,
+    #     d_micro_to_pix_temp=d_micro_to_pix_temp,
+    #     k_extract_pix_phase_from_top=phaseanalyzer.k_extract_pix_phase_from_top,
+    #     convolve_size_temp=convolve_size_temp,
+    #     Nx=int(Nx),
+    #     Nz=int(Nz),
+    #     l=int(l),
+    #     n_apr_pix=int(n_apr_pix),
+    #     h0=h0,
+    #     lamda=lamda,
+    #     T_room=T_room,
+    #     target=T_room,
+    #     threshold_cutoff=thredhold_cutoff,
+    #     uniform_filter_size=uniform_filter_size,
+    #     min_points_required=min_points_required
+    # )
 
 if fname_flow is not None:
     temp_flow_path = "temp_uploaded.csv"
@@ -270,10 +256,7 @@ with tab1:
     if fname_phase is not None:
         tab_phase.render_tab_phase(
             phaseanalyzer=phaseanalyzer,
-            x1=x1,
-            x2=x2,
-            z1=z1,
-            z2=z2,
+            offset_area_slice=offset_area_slice,
             h0=h0,
             show_phase_temp_dict=show_phase_temp_dict,
             show_guide_phase_dict=show_guide_phase_dict,

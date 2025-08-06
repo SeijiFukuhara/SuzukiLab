@@ -31,7 +31,7 @@ def plot_phase(np_array,d_temp):
     # plt.savefig(figname)
     # plt.show()
 
-def offset(twolist_array,convolve_size_temp,z1,z2,x1,x2,convolve): #*水温と室温が一致する範囲を指定し，オフセット
+def offset(twolist_array, convolve_size_temp, offset_area_slice, convolve): #*水温と室温が一致する範囲を指定し，オフセット
     #*以下の段落をコメントアウトしているときは[from scipy import signal]の行に「アクセスできません」というメッセージが表示されるが問題ない
     #TODO 移動平均とる場合は以下最初の空行までを有効にする
     # xxに対してsize個での移動平均を取る
@@ -46,7 +46,7 @@ def offset(twolist_array,convolve_size_temp,z1,z2,x1,x2,convolve): #*水温と�
             xx_mean[-i] *= size/(i + n_conv - (size % 2))
         # size%2は奇数偶数での違いに対応するため
         return xx_mean
-    #?自分で書いたけど意味わからない
+    #* convolve == Trueのときのみconvolve処理
     if convolve == True:
         twoarray_convolve = []
         onelist_array = []
@@ -58,7 +58,7 @@ def offset(twolist_array,convolve_size_temp,z1,z2,x1,x2,convolve): #*水温と�
     #TODO 左半分の領域が対象ならコメントアウト
     #img_phase = np.fliplr(img_phase)
     #* [z1:z2,x1:x2]の範囲の温度を平均し，その位相を0にoffset，絶対水温の領域を指定．zは縦方向，xは横方向．順番に注意．
-    offset = twolist_array[z1:z2, x1:x2]
+    offset = twolist_array[offset_area_slice]
     #TODO 位相差の逆転を解消．0次光=ピンホール，1次光=スリットのとき有効にする
     twolist_array = offset.mean() - twolist_array
     return twolist_array
@@ -159,6 +159,34 @@ def find_available_filename_combination(input_path):
             return candidate_prefix
 
     raise FileExistsError(f"{tail_name} に対する ~{letter}1_ 〜 ~{letter}9_ がすべて使用されています。")
+
+
+def make_k_dict(k_extract_microm, debug_k_pix, radio_microm_or_pix, d_microm_to_pix, height, origin_height):
+    if radio_microm_or_pix == "k_extract_microm[μm]":
+        k_extract_pix_from_substrate =  int(k_extract_microm * d_microm_to_pix)
+        k_extract_pix_from_bottom = k_extract_pix_from_substrate + origin_height
+        k_extract_microm_from_substrate = k_extract_microm
+        k_extract_microm_from_bottom = round(k_extract_pix_from_bottom / d_microm_to_pix, 2)
+        k_extract_pix_from_top = height - k_extract_pix_from_bottom
+        k_extract_microm_from_top = round(k_extract_pix_from_top / d_microm_to_pix, 2)
+    elif radio_microm_or_pix == "debug_k_pix[pix]":
+        k_extract_pix_from_bottom = debug_k_pix
+        k_extract_pix_from_substrate = k_extract_pix_from_bottom - origin_height
+        k_extract_microm_from_bottom =  round(k_extract_pix_from_bottom / d_microm_to_pix,2)
+        k_extract_microm_from_substrate = round(k_extract_pix_from_substrate / d_microm_to_pix,2)
+        k_extract_pix_from_top = height - k_extract_pix_from_bottom
+        k_extract_microm_from_top = round(k_extract_pix_from_top / d_microm_to_pix, 2)
+    dict = {
+        'k_extract_pix_from_substrate': k_extract_pix_from_substrate,
+        'k_extract_pix_from_bottom': k_extract_pix_from_bottom,
+        'k_extract_microm_from_substrate': k_extract_microm_from_substrate,
+        'k_extract_microm_from_bottom': k_extract_microm_from_bottom,
+        'k_extract_pix_from_top': k_extract_pix_from_top,
+        'k_extract_microm_from_top': k_extract_microm_from_top
+    }
+    return dict
+
+
 
 #! extract_phse,py中の「def _video2images(video):」は入力が100フレームの時、0～n-2フレーム目（そうフレーム数n-1）までしか出力されない。（意図的かは不明）なので、出力フレーム数（imagesのフレーム数）がn枚になるように新たに関数を定義する。
 def video2images_rewrite(video): 
