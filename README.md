@@ -11,13 +11,13 @@ conda activate extract_phase_env環境での動作を確認済み
 
 ## 使い方
 1. `extract_and_flip.py`
-   -  `extract_and_flip.py path_to_video.avi start_frame end_frame --flip`で撮影した`.avi`ファイルを指定のフレームで切り抜き．`--flip`がついているときは上下逆転．省略可．
+   -  `python extract_and_flip.py path_to_video.avi start_frame end_frame --flip`で撮影した`.avi`ファイルを指定のフレームで切り抜き．`--flip`がついているときは上下逆転．省略可．
    -  出力：`.bmp`または`.avi`
 2. `extract_phase_video.py`
-   - `extract_phase_video.py path_to_reference.bmp path_to_video.avi`で，位相を計算フォルダを作成
+   - `python extract_phase_video.py path_to_reference.bmp path_to_video.avi`で，位相を計算フォルダを作成
    - 出力：`位相動画.avi`と`phase.csvのフォルダ`
 3. `calculate_phase.py`
-   - `calculate_phase.py phase.csvのフォルダ true(or false)` で，先ほどの`phase_csvのフォルダ`に対して背景除去、移動平均を行う。移動平均はtrueの場合のみ行い、falseでは行わない。また、大文字と小文字は区別しないようになっている。
+   - `python calculate_phase.py phase.csvのフォルダ true(or false)` で，先ほどの`phase_csvのフォルダ`に対して背景除去、移動平均を行う。移動平均はtrueの場合のみ行い、falseでは行わない。また、大文字と小文字は区別しないようになっている。
    - 出力：カラー位相の`bmpフォルダ`（フォルダ内に各フレームごとの変換画像）
 4. `videoplayer.py`
-   - `videoplayer.py path_to_bmpfolder1 path_to_bmpfolder2`で二つのフォルダ内のbmpを比較可能．
+   - `python videoplayer.py path_to_bmpfolder1 path_to_bmpfolder2`で二つのフォルダ内のbmpを比較可能．

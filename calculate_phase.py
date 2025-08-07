@@ -12,7 +12,7 @@ from datetime import datetime
 from function_calculation import add_tilde_to_filename, find_available_filename_combination
 
 d_temp = 1.9833
-convolve = False #*移動平均をとるかどうか
+# convolve = False #*移動平均をとるかどうか
 convolve_size_temp = 21 #*移動平均サイズ
 z1 = 500
 z2 = 510
